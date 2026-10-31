@@ -24,7 +24,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   return (
     <div className="fade-in flex flex-col gap-7 px-5 pt-10 pb-28">
       <header>
-        <h1 className="text-[28px] font-light tracking-wide">המדריך</h1>
+        <h1 className="text-[34px] font-normal tracking-wide title-psy">המדריך</h1>
         <p className="opacity-75 text-[15px] mt-1">מה הכיוון הערב?</p>
       </header>
 
@@ -51,7 +51,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         <div className="flex flex-wrap gap-2">
           {INTENTIONS.map((i) => (
             <button key={i} onClick={() => { setIntention(i); setCustom('') }}
-              className={`px-4 py-2 rounded-full text-[15px] border transition-all duration-500 ${intention === i && !custom ? 'border-ink/70 bg-ink/15' : 'border-ink/20 opacity-80'}`}>{i}</button>
+              className={`px-4 py-2 rounded-full text-[15px] border transition-all duration-500 ${intention === i && !custom ? 'border-[#FF5FC8] bg-[#FF5FC8]/20 shadow-[0_0_20px_-4px_#FF5FC8]' : 'border-ink/20 opacity-80'}`}>{i}</button>
           ))}
         </div>
         <input value={custom} onChange={(e) => { setCustom(e.target.value); if (e.target.value) setIntention(e.target.value) }} placeholder="או במילים שלך…"
@@ -67,7 +67,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
       )}
 
       <button onClick={() => onStart({ mode, minutes, intention, voice: mode !== 'album' && voice, breath, albumId: mode === 'album' ? album?.id : undefined })}
-        className="fixed bottom-20 right-5 left-5 rounded-2xl py-4 text-[17px] bg-ink text-bg font-normal active:scale-[0.98] transition-transform shadow-[0_12px_40px_-10px_rgba(242,238,230,0.35)]">
+        className="fixed bottom-20 right-5 left-5 rounded-2xl py-4 text-[17px] btn-psy font-normal active:scale-[0.98] transition-transform">
         התחל
       </button>
     </div>

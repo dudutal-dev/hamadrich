@@ -43,7 +43,7 @@ export default function App() {
     setLoading(true)
     const s = await getSettings(); setSettings(s)
     const e = new SessionEngine(plan)
-    await e.init({ haptics: s.haptics, gains: { music: s.musicGain, voice: s.voiceGain, breath: s.breathGain } })
+    await e.init({ haptics: s.haptics, gains: { music: s.musicGain, voice: s.voiceGain, breath: s.breathGain }, output: s.output, binaural: s.binaural })
     e.start()
     setEngine(e); setStartedAt(new Date().toISOString())
     setLoading(false); setStage('journey')
@@ -65,10 +65,11 @@ export default function App() {
 
   return (
     <div className="h-full overflow-y-auto">
+      <div className="bg-psy" />
       {tab === 'journey' && <StartScreen onStart={onStart} />}
       {tab === 'journal' && <JournalScreen />}
       {tab === 'library' && <LibraryScreen />}
-      <nav className="fixed bottom-0 right-0 left-0 flex justify-around py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-[#14121D]/92 backdrop-blur border-t border-ink/10 text-[13px]">
+      <nav className="fixed bottom-0 right-0 left-0 flex justify-around py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-[#0E0B18]/80 backdrop-blur-xl border-t border-ink/10 text-[13px]">
         {([['journey', 'מסע'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`px-6 py-1 transition-opacity ${tab === k ? 'opacity-100' : 'opacity-55'}`}>{l}</button>
         ))}

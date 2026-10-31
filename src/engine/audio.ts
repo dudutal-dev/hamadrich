@@ -5,11 +5,11 @@ const XFADE = 30 // seconds
 
 /** Drone chord per phase: root Hz, intervals (semitones), filter cutoff, gain */
 const DRONE: Record<Phase, { f: number; iv: number[]; cut: number; gain: number; shimmer: number }> = {
-  1: { f: 110, iv: [0, 7, 12, 19], cut: 900, gain: 0.32, shimmer: 0.05 },   // A – open fifths
-  2: { f: 98, iv: [0, 7, 12, 16, 19], cut: 1200, gain: 0.36, shimmer: 0.08 }, // G major – warm
-  3: { f: 82.4, iv: [0, 7, 14, 19, 24], cut: 1600, gain: 0.38, shimmer: 0.12 }, // E sus2 – wide
-  4: { f: 110, iv: [0, 5, 12, 16], cut: 1000, gain: 0.33, shimmer: 0.06 },  // A add4 – coming home
-  5: { f: 130.8, iv: [0, 7, 12], cut: 700, gain: 0.22, shimmer: 0.03 },     // C – rest
+  1: { f: 220, iv: [0, 7, 12, 19], cut: 1800, gain: 0.9, shimmer: 0.06 },     // A – open fifths
+  2: { f: 196, iv: [0, 7, 12, 16, 19], cut: 2200, gain: 1.0, shimmer: 0.09 },  // G major – warm
+  3: { f: 164.8, iv: [0, 7, 14, 19, 24], cut: 2800, gain: 1.05, shimmer: 0.14 }, // E sus2 – wide
+  4: { f: 220, iv: [0, 5, 12, 16], cut: 2000, gain: 0.95, shimmer: 0.07 },    // A add4 – coming home
+  5: { f: 261.6, iv: [0, 7, 12], cut: 1500, gain: 0.7, shimmer: 0.04 },       // C – rest
 }
 
 export const BREATH_PATTERNS: Record<BreathPattern, { inhale: number; hold: number; exhale: number; hold2: number; label: string }> = {
@@ -55,13 +55,13 @@ function reverb(ctx: AudioContext): ConvolverNode {
 class Drone {
   private nodes: AudioScheduledSourceNode[] = []
   private gain: GainNode
-  constructor(private ctx: AudioContext, out: AudioNode, phase: Phase) {
+  constructor(private ctx: AudioContext, out: AudioNode, phase: Phase, output: 'speakers' | 'headphones' = 'speakers', binaural = false) {
     const p = DRONE[phase]
     this.gain = ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(out)
     const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = p.cut; filter.Q.value = 0.3
     // dry + wet
-    const dry = ctx.createGain(); dry.gain.value = 0.45
-    const wet = ctx.createGain(); wet.gain.value = 0.75
+    const dry = ctx.createGain(); dry.gain.value = 0.7
+    const wet = ctx.createGain(); wet.gain.value = 0.6
     const rv = reverb(ctx)
     filter.connect(dry); dry.connect(this.gain)
     filter.connect(rv); rv.connect(wet); wet.connect(this.gain)
@@ -76,9 +76,9 @@ class Drone {
       // two slightly detuned voices per note, panned apart
       for (const [det, pan] of [[-5, -0.4], [5, 0.4]] as const) {
         const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq; o.detune.value = det
-        const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = freq; o2.detune.value = det * 1.4
+        const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = freq; o2.detune.value = det * 1.4
         const og = ctx.createGain(); og.gain.value = level
-        const og2 = ctx.createGain(); og2.gain.value = level * 0.12
+        const og2 = ctx.createGain(); og2.gain.value = level * (output === 'speakers' ? 0.22 : 0.14)
         const pn = ctx.createStereoPanner(); pn.pan.value = pan
         // breathing amplitude, very slow, never below 55%
         const lfo = ctx.createOscillator(); lfo.frequency.value = 0.015 + Math.random() * 0.03
@@ -93,6 +93,25 @@ class Drone {
         this.nodes.push(o, o2, lfo, dr)
       }
     })
+    // sub-octave root: only worth it on headphones (phone speakers can't reproduce it)
+    if (output === 'headphones') {
+      const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = p.f / 2
+      const sg = ctx.createGain(); sg.gain.value = 0.35
+      sub.connect(sg); sg.connect(filter); sub.start(); this.nodes.push(sub)
+    }
+    // binaural beat (headphones): carrier on the root, L/R differ by a theta/alpha offset per phase
+    if (output === 'headphones' && binaural) {
+      const beat = phase === 3 ? 4.5 : phase === 2 || phase === 4 ? 7 : 10 // theta at peak, alpha-ish elsewhere
+      const car = p.f
+      const merger = ctx.createChannelMerger(2)
+      const bg = ctx.createGain(); bg.gain.value = 0.18
+      for (const [ch, f] of [[0, car - beat / 2], [1, car + beat / 2]] as const) {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f
+        const g = ctx.createGain(); g.gain.value = 1
+        o.connect(g); g.connect(merger, 0, ch); o.start(); this.nodes.push(o)
+      }
+      merger.connect(bg); bg.connect(this.gain)
+    }
     // shimmer: filtered noise, barely there, through reverb only
     if (p.shimmer > 0) {
       const buf = ctx.createBuffer(1, ctx.sampleRate * 6, ctx.sampleRate)
@@ -163,6 +182,8 @@ export class SessionEngine {
   private lastBreathStep: BreathStep = 'none'
   private vibrate = true
   private gains = { music: 0.8, voice: 1, breath: 0.5 }
+  private output: 'speakers' | 'headphones' = 'speakers'
+  private binaural = true
   state: EngineState
 
   constructor(public plan: SessionPlan) {
@@ -172,13 +193,15 @@ export class SessionEngine {
   on(l: Listener) { this.listeners.add(l); return () => this.listeners.delete(l) }
   private emit() { this.listeners.forEach((l) => l({ ...this.state })) }
 
-  async init(opts: { haptics: boolean; gains: { music: number; voice: number; breath: number } }) {
+  async init(opts: { haptics: boolean; gains: { music: number; voice: number; breath: number }; output?: 'speakers' | 'headphones'; binaural?: boolean }) {
     this.vibrate = opts.haptics
     this.gains = opts.gains
+    this.output = opts.output ?? 'speakers'
+    this.binaural = opts.binaural ?? true
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     this.ctx = ctx
-    this.master = ctx.createGain(); this.master.gain.value = 1
-    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 20; comp.ratio.value = 3; comp.attack.value = 0.05; comp.release.value = 0.4
+    this.master = ctx.createGain(); this.master.gain.value = 1.6
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.05; comp.release.value = 0.4
     this.master.connect(comp); comp.connect(ctx.destination)
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.gains.music; this.musicBus.connect(this.master)
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.gains.voice; this.voiceBus.connect(this.master)
@@ -253,7 +276,7 @@ export class SessionEngine {
         this.current = new Track(this.ctx, this.musicBus, this.buffers.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE)
         prev?.stop(isAlbum ? 1.5 : XFADE)
       } else {
-        this.current = new Drone(this.ctx, this.musicBus, this.state.phase)
+        this.current = new Drone(this.ctx, this.musicBus, this.state.phase, this.output, this.binaural)
         prev?.stop(XFADE)
       }
     }
@@ -297,9 +320,9 @@ export class SessionEngine {
     const g = this.ctx.createGain(); g.gain.value = 0
     o.connect(g); g.connect(this.breathBus)
     const now = this.ctx.currentTime
-    if (step === 'inhale') { o.frequency.setValueAtTime(220, now); o.frequency.linearRampToValueAtTime(330, now + dur) }
-    else { o.frequency.setValueAtTime(330, now); o.frequency.linearRampToValueAtTime(196, now + dur) }
-    g.gain.linearRampToValueAtTime(0.12, now + dur * 0.4)
+    if (step === 'inhale') { o.frequency.setValueAtTime(392, now); o.frequency.linearRampToValueAtTime(587, now + dur) }
+    else { o.frequency.setValueAtTime(587, now); o.frequency.linearRampToValueAtTime(349, now + dur) }
+    g.gain.linearRampToValueAtTime(0.35, now + dur * 0.4)
     g.gain.linearRampToValueAtTime(0, now + dur)
     o.start(now); o.stop(now + dur + 0.1)
   }
@@ -355,7 +378,7 @@ export class SessionEngine {
   calm() {
     if (!this.ctx) return
     const prev = this.current
-    this.current = new Drone(this.ctx, this.musicBus, 5)
+    this.current = new Drone(this.ctx, this.musicBus, 5, this.output, false)
     prev?.stop(4)
     this.breathPattern = 'coherent'; this.breathStart = this.elapsed; this.state.breathPattern = 'coherent'
   }

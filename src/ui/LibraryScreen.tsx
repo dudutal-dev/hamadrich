@@ -205,6 +205,16 @@ function SettingsPane() {
         <p className="text-[13px] opacity-70">המפתח נשמר רק במכשיר הזה. הפקת קול דורשת רשת; המסע עצמו לא.</p>
       </section>
       <section className="flex flex-col gap-3">
+        <div className="text-[17px]">פלט</div>
+        <div className="grid grid-cols-2 gap-2">
+          {(['speakers', 'headphones'] as const).map((o) => (
+            <button key={o} onClick={() => save({ output: o })} className={`rounded-xl py-3 border transition-all ${s.output === o ? 'border-[#FF5FC8] bg-[#FF5FC8]/20' : 'border-ink/20 opacity-75'}`}>{o === 'speakers' ? 'רמקולים' : 'אוזניות'}</button>
+          ))}
+        </div>
+        <p className="text-[13px] opacity-70">רמקולים: הדרון מכוון גבוה יותר כדי שיישמע בטלפון. אוזניות: מוסיף תת-אוקטבה ושכבה ביניאורלית (תטא בשיא).</p>
+        {s.output === 'headphones' && <label className="flex items-center justify-between"><span>שכבה ביניאורלית</span><input type="checkbox" checked={s.binaural} onChange={(e) => save({ binaural: e.target.checked })} /></label>}
+      </section>
+      <section className="flex flex-col gap-3">
         <div className="text-[17px]">עוצמות</div>
         <Slider k="musicGain" label="מוזיקה" /><Slider k="voiceGain" label="קריינות" /><Slider k="breathGain" label="צלילי נשימה" />
         <label className="flex items-center justify-between"><span>רטט בנשימה</span><input type="checkbox" checked={s.haptics} onChange={(e) => save({ haptics: e.target.checked })} /></label>

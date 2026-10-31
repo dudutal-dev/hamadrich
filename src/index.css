@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #14121D;
-  --color-bg2: #1C1929;
-  --color-card: #1F1B2E;
+  --color-bg: #0E0B18;
+  --color-bg2: #17122A;
+  --color-card: #1B1530;
   --color-ink: #F2EEE6;
   --color-p1: #3B6BC9; /* הגעה – כחול עמוק */
   --color-p2: #3FB7A8; /* שחרור – טורקיז */
@@ -17,7 +17,7 @@
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: radial-gradient(120% 80% at 50% -10%, #2A2440 0%, var(--color-bg) 55%, #0F0D17 100%) fixed;
+  background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-weight: 300;
@@ -38,15 +38,36 @@ html, body, #root {
 .fade-in { animation: fadeIn 900ms var(--ease-soft) both; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.card { background: color-mix(in srgb, var(--color-card) 85%, transparent); border: 1px solid rgba(242,238,230,0.10); }
-.card-active { background: color-mix(in srgb, var(--color-card) 100%, white 6%); border-color: rgba(242,238,230,0.45); box-shadow: 0 0 0 1px rgba(242,238,230,0.08), 0 10px 30px -12px rgba(0,0,0,0.6); }
-.glow { position: absolute; inset: 0; pointer-events: none; }
+.card { background: linear-gradient(160deg, rgba(123,47,214,0.14), rgba(25,184,166,0.08)); border: 1px solid rgba(242,238,230,0.12); backdrop-filter: blur(6px); }
+.card-active { background: linear-gradient(160deg, rgba(123,47,214,0.42), rgba(255,95,200,0.22)); border-color: rgba(255,95,200,0.7); box-shadow: 0 0 0 1px rgba(255,95,200,0.25), 0 0 40px -8px rgba(255,95,200,0.55); }
+
+/* psychedelic background: drifting color blobs */
+.bg-psy { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #0E0B18; }
+.bg-psy::before, .bg-psy::after { content: ''; position: absolute; width: 90vmax; height: 90vmax; border-radius: 50%; filter: blur(70px); opacity: 0.55; mix-blend-mode: screen; }
+.bg-psy::before { background: radial-gradient(circle, #7B2FD6 0%, #2F5FE0 45%, transparent 70%); top: -35vmax; right: -25vmax; animation: drift1 28s ease-in-out infinite alternate; }
+.bg-psy::after { background: radial-gradient(circle, #19B8A6 0%, #FF5FC8 50%, transparent 70%); bottom: -40vmax; left: -30vmax; animation: drift2 34s ease-in-out infinite alternate; }
+@keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(-18vmax, 22vmax) scale(1.15); } }
+@keyframes drift2 { from { transform: translate(0,0) scale(1.1); } to { transform: translate(22vmax, -20vmax) scale(0.95); } }
+
+/* journey aurora driven by phase colors */
+.aurora { position: absolute; inset: 0; pointer-events: none; }
+.aurora::before, .aurora::after { content: ''; position: absolute; width: 110vmax; height: 110vmax; border-radius: 50%; filter: blur(80px); mix-blend-mode: screen; opacity: 0.5; transition: background 3000ms; }
+.aurora::before { background: radial-gradient(circle, var(--c1) 0%, transparent 60%); top: -50vmax; left: -30vmax; animation: drift1 40s ease-in-out infinite alternate; }
+.aurora::after { background: radial-gradient(circle, var(--c2) 0%, transparent 60%); bottom: -55vmax; right: -35vmax; animation: drift2 46s ease-in-out infinite alternate; opacity: 0.35; }
+
+.spin-slow { animation: spin 150s linear infinite; transform-origin: 50% 50%; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.aura { animation: aura 6s ease-in-out infinite; }
+@keyframes aura { 0%,100% { transform: scale(0.95); opacity: .6; } 50% { transform: scale(1.08); opacity: 1; } }
+
+.title-psy { background: linear-gradient(100deg, #FF5FC8, #9FF5D8 45%, #FFD08A); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.btn-psy { background: linear-gradient(100deg, #FF5FC8, #7B2FD6 50%, #2F5FE0); color: #fff; box-shadow: 0 10px 40px -10px rgba(255,95,200,0.7); }
 
 .breathe { animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe { 0%,100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.06); opacity: .9; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .fade-in { animation: none; }
+  .fade-in, .bg-psy::before, .bg-psy::after, .aurora::before, .aurora::after, .spin-slow, .aura { animation: none; }
   * { transition-duration: 0ms !important; }
 }
 

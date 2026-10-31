@@ -89,6 +89,8 @@ export interface Settings {
   voiceGain: number
   breathGain: number
   haptics: boolean
+  output: 'speakers' | 'headphones'
+  binaural: boolean
   emergencyName?: string
   emergencyPhone?: string
 }
@@ -123,8 +125,10 @@ export const DEFAULT_SETTINGS: Settings = {
   id: 'main',
   musicGain: 0.8,
   voiceGain: 1,
-  breathGain: 0.5,
+  breathGain: 0.6,
   haptics: true,
+  output: 'speakers',
+  binaural: true,
 }
 
 export async function getSettings(): Promise<Settings> {

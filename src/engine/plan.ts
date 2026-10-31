@@ -8,12 +8,20 @@ export const PHASE_NAMES: Record<Phase, string> = {
   5: 'אינטגרציה',
 }
 
+/** primary (deep) and secondary (bright) color per phase */
 export const PHASE_COLORS: Record<Phase, string> = {
-  1: '#3B6BC9',
-  2: '#3FB7A8',
-  3: '#4A2A6B',
-  4: '#D99A3C',
-  5: '#E9D8A6',
+  1: '#2F5FE0', // הגעה – כחול חשמלי
+  2: '#19B8A6', // שחרור – טורקיז
+  3: '#7B2FD6', // שיא – סגול
+  4: '#E8842E', // חזרה – כתום-ענבר
+  5: '#E3B341', // אינטגרציה – זהב
+}
+export const PHASE_COLORS2: Record<Phase, string> = {
+  1: '#8FD3FF',
+  2: '#9FF5D8',
+  3: '#FF5FC8',
+  4: '#FFD08A',
+  5: '#FFF2B8',
 }
 
 export const MODE_META: Record<Mode, { name: string; sub: string; defaultMin: number; minMin: number; maxMin: number }> = {
