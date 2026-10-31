@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #07060B;
+  --color-ink: #E8E4DC;
+  --color-p1: #3B6BC9; /* הגעה – כחול עמוק */
+  --color-p2: #3FB7A8; /* שחרור – טורקיז */
+  --color-p3: #4A2A6B; /* שיא – סגול כהה */
+  --color-p4: #D99A3C; /* חזרה – ענבר */
+  --color-p5: #E9D8A6; /* אינטגרציה – זהב חיוור */
+  --font-sans: "Heebo", system-ui, sans-serif;
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+* { transition-timing-function: var(--ease-soft); }
+
+.fade-in { animation: fadeIn 900ms var(--ease-soft) both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.breathe { animation: breathe 4s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.06); opacity: .9; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in { animation: none; }
+  * { transition-duration: 0ms !important; }
+}
+
+input[type=range] { accent-color: var(--color-ink); }
