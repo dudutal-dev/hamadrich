@@ -25,7 +25,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
     <div className="fade-in flex flex-col gap-7 px-5 pt-10 pb-28">
       <header>
         <h1 className="text-[28px] font-light tracking-wide">המדריך</h1>
-        <p className="opacity-60 text-[15px] mt-1">מה הכיוון הערב?</p>
+        <p className="opacity-75 text-[15px] mt-1">מה הכיוון הערב?</p>
       </header>
 
       <div className="grid grid-cols-2 gap-3">
@@ -33,9 +33,9 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
           const active = mode === m
           return (
             <button key={m} onClick={() => pick(m)} onContextMenu={(e) => { e.preventDefault(); setAdv(true) }}
-              className={`text-right rounded-2xl p-4 border transition-all duration-700 ${active ? 'border-ink/60 bg-ink/8' : 'border-ink/12 bg-transparent'} ${m === 'album' ? 'col-span-2' : ''}`}>
+              className={`text-right rounded-2xl p-4 card transition-all duration-700 ${active ? 'card-active' : ''} ${m === 'album' ? 'col-span-2' : ''}`}>
               <div className="text-[17px]">{MODE_META[m].name}</div>
-              <div className="text-[13px] opacity-55 mt-1 leading-snug">{m === 'album' && album ? `${album.trackCount} רצועות · ${Math.round(album.totalSec / 60)} דק'` : MODE_META[m].sub}</div>
+              <div className="text-[13px] opacity-70 mt-1 leading-snug">{m === 'album' && album ? `${album.trackCount} רצועות · ${Math.round(album.totalSec / 60)} דק'` : MODE_META[m].sub}</div>
             </button>
           )
         })}
@@ -51,7 +51,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         <div className="flex flex-wrap gap-2">
           {INTENTIONS.map((i) => (
             <button key={i} onClick={() => { setIntention(i); setCustom('') }}
-              className={`px-4 py-2 rounded-full text-[15px] border transition-all duration-500 ${intention === i && !custom ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-70'}`}>{i}</button>
+              className={`px-4 py-2 rounded-full text-[15px] border transition-all duration-500 ${intention === i && !custom ? 'border-ink/70 bg-ink/15' : 'border-ink/20 opacity-80'}`}>{i}</button>
           ))}
         </div>
         <input value={custom} onChange={(e) => { setCustom(e.target.value); if (e.target.value) setIntention(e.target.value) }} placeholder="או במילים שלך…"
@@ -67,7 +67,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
       )}
 
       <button onClick={() => onStart({ mode, minutes, intention, voice: mode !== 'album' && voice, breath, albumId: mode === 'album' ? album?.id : undefined })}
-        className="fixed bottom-20 right-5 left-5 rounded-2xl py-4 text-[17px] bg-ink text-bg font-normal active:scale-[0.98] transition-transform">
+        className="fixed bottom-20 right-5 left-5 rounded-2xl py-4 text-[17px] bg-ink text-bg font-normal active:scale-[0.98] transition-transform shadow-[0_12px_40px_-10px_rgba(242,238,230,0.35)]">
         התחל
       </button>
     </div>

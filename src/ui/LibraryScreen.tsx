@@ -12,7 +12,7 @@ export function LibraryScreen() {
       <h1 className="text-[28px] font-light">ספרייה</h1>
       <div className="flex gap-5 text-[15px] border-b border-ink/10">
         {(['texts', 'music', 'settings'] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`pb-2 -mb-px border-b transition-all ${tab === t ? 'border-ink/70' : 'border-transparent opacity-50'}`}>{{ texts: 'טקסטים', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
+          <button key={t} onClick={() => setTab(t)} className={`pb-2 -mb-px border-b transition-all ${tab === t ? 'border-ink/70' : 'border-transparent opacity-70'}`}>{{ texts: 'טקסטים', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
         ))}
       </div>
       {tab === 'texts' && <Texts />}
@@ -49,7 +49,7 @@ function Texts() {
   const missing = texts.filter((t) => !t.voiceAssetId).length
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-between items-center text-[13px] opacity-60">
+      <div className="flex justify-between items-center text-[13px] opacity-75">
         <span>{texts.length} טקסטים · {missing} ללא קול</span>
         <div className="flex gap-4">
           {missing > 0 && <button onClick={synthAll} disabled={!!busy}>הפק קול לכולם</button>}
@@ -58,14 +58,14 @@ function Texts() {
       </div>
       {msg && <div className="text-[13px] text-amber-200/80">{msg}</div>}
       {texts.map((t) => (
-        <div key={t.id} className="border border-ink/10 rounded-2xl p-4">
+        <div key={t.id} className="card rounded-2xl p-4">
           <div className="flex justify-between">
             <div className="text-[17px]">{t.title}</div>
-            <div className="text-[13px] opacity-50">{t.phases.map((p) => PHASE_NAMES[p]).join(' · ')}</div>
+            <div className="text-[13px] opacity-70">{t.phases.map((p) => PHASE_NAMES[p]).join(' · ')}</div>
           </div>
           <p className="text-[15px] opacity-70 leading-relaxed mt-2 line-clamp-2">{t.body}</p>
           <div className="flex gap-4 text-[13px] mt-3 opacity-70">
-            {t.voiceAssetId ? <button onClick={() => play(t)}>▶ האזן</button> : <span className="opacity-60">אין קול</span>}
+            {t.voiceAssetId ? <button onClick={() => play(t)}>▶ האזן</button> : <span className="opacity-75">אין קול</span>}
             <button onClick={() => synth(t)} disabled={busy === t.id}>{busy === t.id ? 'מפיק…' : t.voiceAssetId ? 'הפק מחדש' : 'הפק קריינות'}</button>
             <RecordButton text={t} onDone={reload} />
             <button onClick={() => setEdit(t)}>ערוך</button>
@@ -95,15 +95,15 @@ function TextEditor({ item, onClose }: { item: TextItem; onClose: () => void }) 
     <div className="fixed inset-0 bg-bg/95 z-50 flex flex-col gap-4 px-5 pt-12 pb-8 overflow-y-auto">
       <input value={t.title} onChange={(e) => setT({ ...t, title: e.target.value })} placeholder="כותרת" className="bg-transparent border-b border-ink/15 py-2 text-[20px] outline-none" />
       <textarea value={t.body} onChange={(e) => setT({ ...t, body: e.target.value })} placeholder="הטקסט, כפי שייאמר…" rows={8} className="bg-transparent border border-ink/12 rounded-xl p-3 text-[17px] leading-relaxed outline-none resize-none" />
-      <div className="text-[13px] opacity-55">שלבים</div>
+      <div className="text-[13px] opacity-70">שלבים</div>
       <div className="flex flex-wrap gap-2">
-        {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => togglePhase(p)} className={`px-3 py-1.5 rounded-full border text-[13px] ${t.phases.includes(p) ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-60'}`}>{PHASE_NAMES[p]}</button>)}
+        {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => togglePhase(p)} className={`px-3 py-1.5 rounded-full border text-[13px] ${t.phases.includes(p) ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-75'}`}>{PHASE_NAMES[p]}</button>)}
       </div>
       <input value={t.intentions.join(', ')} onChange={(e) => setT({ ...t, intentions: e.target.value.split(/[,\s]+/).filter(Boolean) })} placeholder="כוונות (שקט, ריפוי…)" className="bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none" />
       <input value={t.source} onChange={(e) => setT({ ...t, source: e.target.value })} placeholder="מקור" className="bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none" />
       <div className="mt-auto flex flex-col gap-3">
         <button onClick={save} className="rounded-2xl py-4 bg-ink text-bg text-[17px]">שמור</button>
-        <div className="flex justify-between text-[15px] opacity-60"><button onClick={onClose}>ביטול</button><button onClick={del}>מחק</button></div>
+        <div className="flex justify-between text-[15px] opacity-75"><button onClick={onClose}>ביטול</button><button onClick={del}>מחק</button></div>
       </div>
     </div>
   )
@@ -138,32 +138,32 @@ function Music() {
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="border border-ink/10 rounded-2xl p-4 flex flex-col gap-3">
+      <section className="card rounded-2xl p-4 flex flex-col gap-3">
         <div className="text-[17px]">אלבום כמסע</div>
-        <p className="text-[13px] opacity-60 leading-relaxed">בחר את כל קבצי האלבום בבת אחת (MP3 מ-Bandcamp). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
+        <p className="text-[13px] opacity-75 leading-relaxed">בחר את כל קבצי האלבום בבת אחת (MP3 מ-Bandcamp). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
         <input value={albumName} onChange={(e) => setAlbumName(e.target.value)} className="bg-transparent border-b border-ink/15 py-1 text-[15px] outline-none" />
         <input ref={albumInput} type="file" accept="audio/*" multiple hidden onChange={(e) => onAlbum(e.target.files)} />
         <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 border border-ink/25 text-[15px]">בחר קבצים</button>
         {albums.map((a) => (
           <div key={a.id} className="flex justify-between items-center text-[15px] pt-2 border-t border-ink/10">
             <span>{a.name} · {a.trackCount} רצועות · {Math.round(a.totalSec / 60)} דק'</span>
-            <button onClick={() => { if (confirm('למחוק את האלבום מהאפליקציה?')) void deleteAlbum(a.id).then(reload) }} className="text-[13px] opacity-50">מחק</button>
+            <button onClick={() => { if (confirm('למחוק את האלבום מהאפליקציה?')) void deleteAlbum(a.id).then(reload) }} className="text-[13px] opacity-70">מחק</button>
           </div>
         ))}
       </section>
 
-      <section className="border border-ink/10 rounded-2xl p-4 flex flex-col gap-3">
+      <section className="card rounded-2xl p-4 flex flex-col gap-3">
         <div className="text-[17px]">רצועות אמביינט לשלבים</div>
-        <p className="text-[13px] opacity-60 leading-relaxed">קבצים בודדים לשימוש במצבי נשימה/מדיטציה/מסע. בלי קבצים האפליקציה מנגנת דרון מובנה.</p>
+        <p className="text-[13px] opacity-75 leading-relaxed">קבצים בודדים לשימוש במצבי נשימה/מדיטציה/מסע. בלי קבצים האפליקציה מנגנת דרון מובנה.</p>
         <div className="flex flex-wrap gap-2">
-          {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => setLoosePhases(loosePhases.includes(p) ? loosePhases.filter((x) => x !== p) : [...loosePhases, p].sort())} className={`px-3 py-1.5 rounded-full border text-[13px] ${loosePhases.includes(p) ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-60'}`}>{PHASE_NAMES[p]}</button>)}
+          {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => setLoosePhases(loosePhases.includes(p) ? loosePhases.filter((x) => x !== p) : [...loosePhases, p].sort())} className={`px-3 py-1.5 rounded-full border text-[13px] ${loosePhases.includes(p) ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-75'}`}>{PHASE_NAMES[p]}</button>)}
         </div>
         <input ref={looseInput} type="file" accept="audio/*" multiple hidden onChange={(e) => onLoose(e.target.files)} />
         <button onClick={() => looseInput.current?.click()} className="rounded-xl py-3 border border-ink/25 text-[15px]">הוסף קבצים לשלבים שנבחרו</button>
         {loose.map((a) => (
           <div key={a.id} className="flex justify-between items-center text-[15px] pt-2 border-t border-ink/10">
-            <span className="truncate ml-3">{a.name} <span className="opacity-50 text-[13px]">· {a.phases.map((p) => PHASE_NAMES[p]).join('/')} · {Math.round(a.durationSec / 60)} דק'</span></span>
-            <button onClick={() => void db.assets.delete(a.id).then(reload)} className="text-[13px] opacity-50">מחק</button>
+            <span className="truncate ml-3">{a.name} <span className="opacity-70 text-[13px]">· {a.phases.map((p) => PHASE_NAMES[p]).join('/')} · {Math.round(a.durationSec / 60)} דק'</span></span>
+            <button onClick={() => void db.assets.delete(a.id).then(reload)} className="text-[13px] opacity-70">מחק</button>
           </div>
         ))}
       </section>
@@ -194,7 +194,7 @@ function SettingsPane() {
         <input type="password" value={s.elevenKey ?? ''} onChange={(e) => save({ elevenKey: e.target.value })} placeholder="מפתח API" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
         <div className="flex gap-3 items-center">
           <input value={s.voiceId ?? ''} onChange={(e) => save({ voiceId: e.target.value })} placeholder="Voice ID" className="flex-1 bg-transparent border-b border-ink/15 py-2 outline-none" />
-          <button onClick={loadVoices} className="text-[13px] opacity-60">טען קולות</button>
+          <button onClick={loadVoices} className="text-[13px] opacity-75">טען קולות</button>
         </div>
         {voices.length > 0 && (
           <select value={s.voiceId ?? ''} onChange={(e) => save({ voiceId: e.target.value })} className="bg-bg border border-ink/15 rounded-lg p-2">
@@ -202,7 +202,7 @@ function SettingsPane() {
             {voices.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}</option>)}
           </select>
         )}
-        <p className="text-[13px] opacity-50">המפתח נשמר רק במכשיר הזה. הפקת קול דורשת רשת; המסע עצמו לא.</p>
+        <p className="text-[13px] opacity-70">המפתח נשמר רק במכשיר הזה. הפקת קול דורשת רשת; המסע עצמו לא.</p>
       </section>
       <section className="flex flex-col gap-3">
         <div className="text-[17px]">עוצמות</div>
@@ -213,9 +213,9 @@ function SettingsPane() {
         <div className="text-[17px]">איש קשר לחירום</div>
         <input value={s.emergencyName ?? ''} onChange={(e) => save({ emergencyName: e.target.value })} placeholder="שם" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
         <input value={s.emergencyPhone ?? ''} onChange={(e) => save({ emergencyPhone: e.target.value })} placeholder="טלפון" inputMode="tel" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
-        <p className="text-[13px] opacity-50">מופיע כקיצור במסך החירום (לחיצה ארוכה 3 שניות בזמן מסע).</p>
+        <p className="text-[13px] opacity-70">מופיע כקיצור במסך החירום (לחיצה ארוכה 3 שניות בזמן מסע).</p>
       </section>
-      <section className="text-[13px] opacity-50 leading-relaxed">
+      <section className="text-[13px] opacity-70 leading-relaxed">
         המדריך מלווה נשימה, מדיטציה ומסעות עצמאיים. הוא אינו כלי רפואי ואינו מחליף ליווי אנושי. הכל נשמר במכשיר בלבד.
       </section>
     </div>

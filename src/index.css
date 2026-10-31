@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #07060B;
-  --color-ink: #E8E4DC;
+  --color-bg: #14121D;
+  --color-bg2: #1C1929;
+  --color-card: #1F1B2E;
+  --color-ink: #F2EEE6;
   --color-p1: #3B6BC9; /* הגעה – כחול עמוק */
   --color-p2: #3FB7A8; /* שחרור – טורקיז */
   --color-p3: #4A2A6B; /* שיא – סגול כהה */
@@ -15,7 +17,7 @@
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: var(--color-bg);
+  background: radial-gradient(120% 80% at 50% -10%, #2A2440 0%, var(--color-bg) 55%, #0F0D17 100%) fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-weight: 300;
@@ -35,6 +37,10 @@ html, body, #root {
 
 .fade-in { animation: fadeIn 900ms var(--ease-soft) both; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.card { background: color-mix(in srgb, var(--color-card) 85%, transparent); border: 1px solid rgba(242,238,230,0.10); }
+.card-active { background: color-mix(in srgb, var(--color-card) 100%, white 6%); border-color: rgba(242,238,230,0.45); box-shadow: 0 0 0 1px rgba(242,238,230,0.08), 0 10px 30px -12px rgba(0,0,0,0.6); }
+.glow { position: absolute; inset: 0; pointer-events: none; }
 
 .breathe { animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe { 0%,100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.06); opacity: .9; } }

@@ -3,13 +3,13 @@ import { PHASE_NAMES } from './plan'
 
 const XFADE = 30 // seconds
 
-/** Drone parameters per phase: base freq, detune, filter cutoff, noise level */
-const DRONE: Record<Phase, { f: number; cut: number; noise: number; gain: number }> = {
-  1: { f: 55, cut: 420, noise: 0.05, gain: 0.35 },
-  2: { f: 48.99, cut: 650, noise: 0.08, gain: 0.45 },
-  3: { f: 41.2, cut: 900, noise: 0.12, gain: 0.5 },
-  4: { f: 55, cut: 520, noise: 0.06, gain: 0.4 },
-  5: { f: 65.4, cut: 360, noise: 0.03, gain: 0.25 },
+/** Drone chord per phase: root Hz, intervals (semitones), filter cutoff, gain */
+const DRONE: Record<Phase, { f: number; iv: number[]; cut: number; gain: number; shimmer: number }> = {
+  1: { f: 110, iv: [0, 7, 12, 19], cut: 900, gain: 0.32, shimmer: 0.05 },   // A – open fifths
+  2: { f: 98, iv: [0, 7, 12, 16, 19], cut: 1200, gain: 0.36, shimmer: 0.08 }, // G major – warm
+  3: { f: 82.4, iv: [0, 7, 14, 19, 24], cut: 1600, gain: 0.38, shimmer: 0.12 }, // E sus2 – wide
+  4: { f: 110, iv: [0, 5, 12, 16], cut: 1000, gain: 0.33, shimmer: 0.06 },  // A add4 – coming home
+  5: { f: 130.8, iv: [0, 7, 12], cut: 700, gain: 0.22, shimmer: 0.03 },     // C – rest
 }
 
 export const BREATH_PATTERNS: Record<BreathPattern, { inhale: number; hold: number; exhale: number; hold2: number; label: string }> = {
@@ -36,47 +36,78 @@ export interface EngineState {
 
 type Listener = (s: EngineState) => void
 
+/** shared reverb impulse (built once per context) */
+const reverbCache = new WeakMap<AudioContext, ConvolverNode>()
+function reverb(ctx: AudioContext): ConvolverNode {
+  let c = reverbCache.get(ctx)
+  if (c) return c
+  const sec = 7, len = ctx.sampleRate * sec
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate)
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch)
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2)
+  }
+  c = ctx.createConvolver(); c.buffer = buf
+  reverbCache.set(ctx, c)
+  return c
+}
+
 class Drone {
-  private nodes: AudioNode[] = []
+  private nodes: AudioScheduledSourceNode[] = []
   private gain: GainNode
   constructor(private ctx: AudioContext, out: AudioNode, phase: Phase) {
     const p = DRONE[phase]
-    this.gain = ctx.createGain()
-    this.gain.gain.value = 0
-    this.gain.connect(out)
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = p.cut
-    filter.Q.value = 0.7
-    filter.connect(this.gain)
-    for (const [mult, det, g] of [[1, 0, 0.5], [1, 4, 0.35], [2, -3, 0.18], [1.5, 2, 0.12]] as const) {
-      const o = ctx.createOscillator()
-      o.type = mult === 2 ? 'triangle' : 'sine'
-      o.frequency.value = p.f * mult
-      o.detune.value = det
-      const og = ctx.createGain(); og.gain.value = g
-      // slow LFO on gain for movement
-      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.03 + Math.random() * 0.05
-      const lg = ctx.createGain(); lg.gain.value = g * 0.4
-      lfo.connect(lg); lg.connect(og.gain)
-      o.connect(og); og.connect(filter)
-      o.start(); lfo.start()
-      this.nodes.push(o, lfo)
+    this.gain = ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(out)
+    const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = p.cut; filter.Q.value = 0.3
+    // dry + wet
+    const dry = ctx.createGain(); dry.gain.value = 0.45
+    const wet = ctx.createGain(); wet.gain.value = 0.75
+    const rv = reverb(ctx)
+    filter.connect(dry); dry.connect(this.gain)
+    filter.connect(rv); rv.connect(wet); wet.connect(this.gain)
+    // slow filter sweep
+    const fl = ctx.createOscillator(); fl.frequency.value = 0.02
+    const flg = ctx.createGain(); flg.gain.value = p.cut * 0.25
+    fl.connect(flg); flg.connect(filter.frequency); fl.start(); this.nodes.push(fl)
+
+    p.iv.forEach((semi, i) => {
+      const freq = p.f * Math.pow(2, semi / 12)
+      const level = (i === 0 ? 0.5 : 0.28) / Math.sqrt(p.iv.length)
+      // two slightly detuned voices per note, panned apart
+      for (const [det, pan] of [[-5, -0.4], [5, 0.4]] as const) {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq; o.detune.value = det
+        const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = freq; o2.detune.value = det * 1.4
+        const og = ctx.createGain(); og.gain.value = level
+        const og2 = ctx.createGain(); og2.gain.value = level * 0.12
+        const pn = ctx.createStereoPanner(); pn.pan.value = pan
+        // breathing amplitude, very slow, never below 55%
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 0.015 + Math.random() * 0.03
+        const lg = ctx.createGain(); lg.gain.value = level * 0.45
+        lfo.connect(lg); lg.connect(og.gain)
+        // slow drift in pitch
+        const dr = ctx.createOscillator(); dr.frequency.value = 0.05 + Math.random() * 0.05
+        const drg = ctx.createGain(); drg.gain.value = 2.5
+        dr.connect(drg); drg.connect(o.detune)
+        o.connect(og); o2.connect(og2); og.connect(pn); og2.connect(pn); pn.connect(filter)
+        o.start(); o2.start(); lfo.start(); dr.start()
+        this.nodes.push(o, o2, lfo, dr)
+      }
+    })
+    // shimmer: filtered noise, barely there, through reverb only
+    if (p.shimmer > 0) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 6, ctx.sampleRate)
+      const d = buf.getChannelData(0)
+      let b0 = 0, b1 = 0, b2 = 0
+      for (let i = 0; i < d.length; i++) {
+        const w = Math.random() * 2 - 1
+        b0 = 0.99765 * b0 + w * 0.099046; b1 = 0.963 * b1 + w * 0.2965164; b2 = 0.57 * b2 + w * 1.0526913
+        d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.05
+      }
+      const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true
+      const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 1800; nf.Q.value = 0.8
+      const ng = ctx.createGain(); ng.gain.value = p.shimmer
+      n.connect(nf); nf.connect(ng); ng.connect(rv); n.start(); this.nodes.push(n)
     }
-    // pink-ish noise
-    const buf = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate)
-    const d = buf.getChannelData(0)
-    let b0 = 0, b1 = 0, b2 = 0
-    for (let i = 0; i < d.length; i++) {
-      const w = Math.random() * 2 - 1
-      b0 = 0.99765 * b0 + w * 0.099046; b1 = 0.963 * b1 + w * 0.2965164; b2 = 0.57 * b2 + w * 1.0526913
-      d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.08
-    }
-    const n = ctx.createBufferSource(); n.buffer = buf; n.loop = true
-    const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 800
-    const ng = ctx.createGain(); ng.gain.value = p.noise
-    n.connect(nf); nf.connect(ng); ng.connect(this.gain); n.start()
-    this.nodes.push(n)
     this.gain.gain.linearRampToValueAtTime(p.gain, ctx.currentTime + XFADE)
   }
   stop(fade = XFADE) {
@@ -84,7 +115,7 @@ class Drone {
     this.gain.gain.cancelScheduledValues(t)
     this.gain.gain.setValueAtTime(this.gain.gain.value, t)
     this.gain.gain.linearRampToValueAtTime(0, t + fade)
-    setTimeout(() => { this.nodes.forEach((n) => { try { (n as AudioScheduledSourceNode).stop() } catch { /* */ } }); this.gain.disconnect() }, fade * 1000 + 200)
+    setTimeout(() => { this.nodes.forEach((n) => { try { n.stop() } catch { /* */ } }); this.gain.disconnect() }, fade * 1000 + 200)
   }
 }
 
@@ -146,7 +177,9 @@ export class SessionEngine {
     this.gains = opts.gains
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     this.ctx = ctx
-    this.master = ctx.createGain(); this.master.gain.value = 1; this.master.connect(ctx.destination)
+    this.master = ctx.createGain(); this.master.gain.value = 1
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 20; comp.ratio.value = 3; comp.attack.value = 0.05; comp.release.value = 0.4
+    this.master.connect(comp); comp.connect(ctx.destination)
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.gains.music; this.musicBus.connect(this.master)
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.gains.voice; this.voiceBus.connect(this.master)
     this.breathBus = ctx.createGain(); this.breathBus.gain.value = this.gains.breath; this.breathBus.connect(this.master)

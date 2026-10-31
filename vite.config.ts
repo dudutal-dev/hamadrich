@@ -19,8 +19,8 @@ export default defineConfig({
         dir: 'rtl',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#07060B',
-        theme_color: '#07060B',
+        background_color: '#14121D',
+        theme_color: '#14121D',
         start_url: './',
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },

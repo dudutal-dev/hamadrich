@@ -34,7 +34,7 @@ export function JournalScreen() {
     <div className="fade-in flex flex-col gap-6 px-5 pt-10 pb-28">
       <header className="flex items-end justify-between">
         <h1 className="text-[28px] font-light">יומן</h1>
-        <button onClick={exportMd} className="text-[13px] opacity-50">ייצוא</button>
+        <button onClick={exportMd} className="text-[13px] opacity-70">ייצוא</button>
       </header>
 
       <div className="grid grid-cols-2 gap-3">
@@ -43,8 +43,8 @@ export function JournalScreen() {
       </div>
 
       {stats.last30.length > 1 && (
-        <div className="border border-ink/10 rounded-2xl p-4">
-          <div className="text-[13px] opacity-55 mb-2">מצב רוח אחרי סשן · 30 יום</div>
+        <div className="card rounded-2xl p-4">
+          <div className="text-[13px] opacity-70 mb-2">מצב רוח אחרי סשן · 30 יום</div>
           <svg viewBox="0 0 300 60" className="w-full h-16">
             <polyline fill="none" stroke="#3FB7A8" strokeWidth="1.5" strokeLinejoin="round"
               points={stats.last30.map((e, i) => `${(i / (stats.last30.length - 1)) * 290 + 5},${55 - ((e.moodAfter! - 1) / 4) * 50}`).join(' ')} />
@@ -58,25 +58,25 @@ export function JournalScreen() {
         </div>
       )}
 
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש…" className="w-full bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none placeholder:opacity-40" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש…" className="w-full bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none placeholder:opacity-55" />
 
       <ul className="flex flex-col gap-3">
         {filtered.map((e) => (
-          <li key={e.id} onClick={() => setOpen(open === e.id ? null : e.id)} className="border border-ink/10 rounded-2xl p-4">
+          <li key={e.id} onClick={() => setOpen(open === e.id ? null : e.id)} className="card rounded-2xl p-4">
             <div className="flex justify-between text-[15px]">
               <span>{MODE_META[e.mode].name} · {Math.round(e.actualSec / 60)} דק'</span>
-              <span className="opacity-50 text-[13px]">{new Date(e.startedAt).toLocaleDateString('he-IL')}</span>
+              <span className="opacity-70 text-[13px]">{new Date(e.startedAt).toLocaleDateString('he-IL')}</span>
             </div>
-            <div className="text-[13px] opacity-55 mt-1">{e.intention}{e.tags.length ? ` · ${e.tags.join(' · ')}` : ''}{e.moodBefore && e.moodAfter ? ` · ${e.moodBefore}→${e.moodAfter}` : ''}{!e.completed ? ' · הופסק' : ''}</div>
+            <div className="text-[13px] opacity-70 mt-1">{e.intention}{e.tags.length ? ` · ${e.tags.join(' · ')}` : ''}{e.moodBefore && e.moodAfter ? ` · ${e.moodBefore}→${e.moodAfter}` : ''}{!e.completed ? ' · הופסק' : ''}</div>
             {open === e.id && (e.transcript || e.note) && <p className="text-[15px] leading-relaxed mt-3 opacity-80">{e.transcript}{e.transcript && e.note ? '\n' : ''}{e.note}</p>}
           </li>
         ))}
-        {!entries.length && <li className="opacity-50 text-[15px]">עדיין אין סשנים. היומן מתחיל במסע הראשון.</li>}
+        {!entries.length && <li className="opacity-70 text-[15px]">עדיין אין סשנים. היומן מתחיל במסע הראשון.</li>}
       </ul>
     </div>
   )
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="border border-ink/10 rounded-2xl p-4"><div className="text-[28px] font-light">{value}</div><div className="text-[13px] opacity-55">{label}</div></div>
+  return <div className="card rounded-2xl p-4"><div className="text-[28px] font-light">{value}</div><div className="text-[13px] opacity-70">{label}</div></div>
 }

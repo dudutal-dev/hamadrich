@@ -68,9 +68,9 @@ export default function App() {
       {tab === 'journey' && <StartScreen onStart={onStart} />}
       {tab === 'journal' && <JournalScreen />}
       {tab === 'library' && <LibraryScreen />}
-      <nav className="fixed bottom-0 right-0 left-0 flex justify-around py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-bg/90 backdrop-blur border-t border-ink/8 text-[13px]">
+      <nav className="fixed bottom-0 right-0 left-0 flex justify-around py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-[#14121D]/92 backdrop-blur border-t border-ink/10 text-[13px]">
         {([['journey', 'מסע'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`px-6 py-1 transition-opacity ${tab === k ? 'opacity-100' : 'opacity-40'}`}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className={`px-6 py-1 transition-opacity ${tab === k ? 'opacity-100' : 'opacity-55'}`}>{l}</button>
         ))}
       </nav>
     </div>

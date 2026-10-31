@@ -85,8 +85,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   return (
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
       className="h-full flex flex-col items-center justify-center select-none touch-none"
-      style={{ background: peak ? '#000' : '#07060B', transition: 'background 2000ms' }}>
-      <div className="text-[13px] tracking-[0.3em] mb-10" style={{ opacity: dimAll ? 0 : 0.5, transition: 'opacity 1200ms', color }}>{s.phaseName}</div>
+      style={{ background: peak ? '#08070C' : `radial-gradient(60% 45% at 50% 48%, ${color}2E 0%, transparent 70%), #14121D`, transition: 'background 2000ms' }}>
+      <div className="text-[13px] tracking-[0.3em] mb-10" style={{ opacity: dimAll ? 0 : 0.85, transition: 'opacity 1200ms', color }}>{s.phaseName}</div>
       <Ring progress={progress} color={color} breathScale={breathScale} dim={dimAll} />
       <div className="h-16 mt-10 flex flex-col items-center" style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
         {s.breath !== 'none' ? (
@@ -95,7 +95,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
             <div className="text-[13px] opacity-40 mt-1">{BREATH_PATTERNS[s.breathPattern].label}</div>
           </>
         ) : (
-          <div className="text-[15px] opacity-40 tabular-nums">{s.paused ? 'עצירה' : `${mm}:${ss.toString().padStart(2, '0')}`}</div>
+          <div className="text-[15px] opacity-60 tabular-nums">{s.paused ? 'עצירה' : `${mm}:${ss.toString().padStart(2, '0')}`}</div>
         )}
       </div>
       {s.done && <div className="fade-in text-[17px] opacity-70 mt-6">המסע נגמר</div>}
