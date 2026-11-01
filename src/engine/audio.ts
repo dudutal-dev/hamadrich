@@ -41,11 +41,11 @@ export interface EngineState {
 type Listener = (s: EngineState) => void
 
 /** shared reverb impulse (built once per context) */
-const reverbCache = new WeakMap<AudioContext, ConvolverNode>()
-function reverb(ctx: AudioContext): ConvolverNode {
+const reverbCache = new WeakMap<BaseAudioContext, ConvolverNode>()
+function reverb(ctx: BaseAudioContext): ConvolverNode {
   let c = reverbCache.get(ctx)
   if (c) return c
-  const sec = 7, len = ctx.sampleRate * sec
+  const sec = ctx instanceof OfflineAudioContext ? 3.5 : 7, len = Math.floor(ctx.sampleRate * sec)
   const buf = ctx.createBuffer(2, len, ctx.sampleRate)
   for (let ch = 0; ch < 2; ch++) {
     const d = buf.getChannelData(ch)
@@ -59,7 +59,7 @@ function reverb(ctx: AudioContext): ConvolverNode {
 class Drone {
   private nodes: AudioScheduledSourceNode[] = []
   private gain: GainNode
-  constructor(private ctx: AudioContext, out: AudioNode, phase: Phase, output: 'speakers' | 'headphones' = 'speakers', binaural = false) {
+  constructor(private ctx: BaseAudioContext, out: AudioNode, phase: Phase, output: 'speakers' | 'headphones' = 'speakers', binaural = false, fadeIn = XFADE) {
     const p = DRONE[phase]
     this.gain = ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(out)
     const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = p.cut; filter.Q.value = 0.3
@@ -131,7 +131,7 @@ class Drone {
       const ng = ctx.createGain(); ng.gain.value = p.shimmer
       n.connect(nf); nf.connect(ng); ng.connect(rv); n.start(); this.nodes.push(n)
     }
-    this.gain.gain.linearRampToValueAtTime(p.gain, ctx.currentTime + XFADE)
+    this.gain.gain.linearRampToValueAtTime(p.gain, ctx.currentTime + fadeIn)
   }
   stop(fade = XFADE) {
     const t = this.ctx.currentTime
@@ -209,6 +209,44 @@ class Track {
   }
 }
 
+/** Render a phase drone to a looping WAV blob (offline), so it can play as a media element and survive iOS backgrounding */
+const LOOP_SEC = 30
+const droneCache = new Map<string, Blob>()
+export async function renderDroneBlob(phase: Phase, output: 'speakers' | 'headphones', binaural: boolean): Promise<Blob> {
+  const key = `${phase}-${output}-${binaural}`
+  const cached = droneCache.get(key); if (cached) return cached
+  const sr = 22050
+  const off = new OfflineAudioContext(2, sr * LOOP_SEC, sr)
+  const out = off.createGain(); out.gain.value = 1; out.connect(off.destination)
+  new Drone(off, out, phase, output, binaural, 0.05)
+  const buf = await off.startRendering()
+  // make it loop seamlessly: crossfade last 3s into first 3s
+  const xf = Math.floor(sr * 3), n = buf.length
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+    const d = buf.getChannelData(ch)
+    for (let i = 0; i < xf; i++) {
+      const a = i / xf
+      d[n - xf + i] = d[n - xf + i] * (1 - a) + d[i] * a
+    }
+  }
+  const blob = encodeWav(buf, n - Math.floor(sr * 0.0))
+  droneCache.set(key, blob)
+  return blob
+}
+function encodeWav(buf: AudioBuffer, length: number): Blob {
+  const ch = buf.numberOfChannels, sr = buf.sampleRate
+  const bytes = 44 + length * ch * 2
+  const ab = new ArrayBuffer(bytes); const v = new DataView(ab)
+  const str = (o: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)) }
+  str(0, 'RIFF'); v.setUint32(4, bytes - 8, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true)
+  v.setUint16(22, ch, true); v.setUint32(24, sr, true); v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true)
+  str(36, 'data'); v.setUint32(40, length * ch * 2, true)
+  let o = 44
+  const chans = Array.from({ length: ch }, (_, i) => buf.getChannelData(i))
+  for (let i = 0; i < length; i++) for (let c = 0; c < ch; c++) { const x = Math.max(-1, Math.min(1, chans[c][i])); v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7fff, true); o += 2 }
+  return new Blob([ab], { type: 'audio/wav' })
+}
+
 export class SessionEngine {
   private ctx: AudioContext | null = null
   private master!: GainNode
@@ -228,6 +266,7 @@ export class SessionEngine {
   private buffers = new Map<string, AudioBuffer>()
   private blobs = new Map<string, Blob>()
   private names = new Map<string, string>()
+  private droneBlobs = new Map<Phase, Blob>()
   private breathPattern: BreathPattern = 'none'
   private breathStart = 0
   private lastBreathStep: BreathStep = 'none'
@@ -281,6 +320,14 @@ export class SessionEngine {
     }))
     const music = await db.assets.bulkGet(musicIds)
     music.forEach((a?: Asset) => { if (a) { this.blobs.set(a.id, a.blob); this.names.set(a.id, a.name) } })
+    // phases that will use the built-in drone → pre-render to looping files (background-safe)
+    const dronePhases = new Set<Phase>()
+    for (const c of this.plan.cues) if (c.layer === 'music' && c.action === 'play' && !c.asset) dronePhases.add(this.plan.phases.find((p) => c.t >= p.startSec && c.t < p.endSec)?.n ?? 3)
+    const order = [...dronePhases].sort((a, b) => a - b)
+    const first = order.find((ph) => this.plan.phases[0]?.n === ph) ?? order[0]
+    if (first !== undefined) { try { this.droneBlobs.set(first, await renderDroneBlob(first, this.output, this.binaural)) } catch (e) { console.warn('drone render failed', e) } }
+    // the rest render lazily while the session runs (each ~1–2 s)
+    void (async () => { for (const ph of order) if (ph !== first) { try { this.droneBlobs.set(ph, await renderDroneBlob(ph, this.output, this.binaural)) } catch { /* fallback to live drone */ } } })()
     this.state.musicGain = this.gains.music
     this.setupMediaSession()
     document.addEventListener('visibilitychange', this.onVisibility)
@@ -362,7 +409,9 @@ export class SessionEngine {
         this.state.trackNo = this.plan.cues.filter((x) => x.layer === 'music' && x.asset).indexOf(c) + 1
         if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.title = this.state.trackName || 'המדריך'
       } else {
-        this.current = new Drone(this.ctx, this.musicBus, this.state.phase, this.output, this.binaural)
+        const blob = this.droneBlobs.get(this.state.phase)
+        if (blob) this.current = new Track(this.ctx, this.musicBus, blob, true, 0, XFADE, true, this.gains.music, this.analyser)
+        else this.current = new Drone(this.ctx, this.musicBus, this.state.phase, this.output, this.binaural)
         prev?.stop(XFADE)
         this.state.trackName = ''
       }

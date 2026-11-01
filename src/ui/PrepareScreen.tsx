@@ -44,7 +44,7 @@ export function PrepareScreen({ mode, onBegin, onCancel, loading }: { mode: Mode
 
       <div className="relative w-full flex flex-col gap-3">
         <button onClick={() => { sessionStorage.setItem('moodBefore', String(mood ?? '')); onBegin() }} disabled={loading}
-          className="rounded-2xl py-4 text-[18px] btn-psy disabled:opacity-70">{loading ? 'טוען צלילים…' : 'אני מוכן'}</button>
+          className="rounded-2xl py-4 text-[18px] btn-psy disabled:opacity-70">{loading ? 'מכין את הצלילים…' : 'אני מוכן'}</button>
         <button onClick={onCancel} className="text-[15px] opacity-70 py-2">ביטול</button>
       </div>
     </div>
