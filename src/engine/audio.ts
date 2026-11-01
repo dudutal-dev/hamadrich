@@ -32,6 +32,10 @@ export interface EngineState {
   breathProgress: number
   breathPattern: BreathPattern
   durationSec: number
+  trackName: string
+  trackNo: number
+  trackCount: number
+  musicGain: number
 }
 
 type Listener = (s: EngineState) => void
@@ -184,6 +188,7 @@ export class SessionEngine {
   private listeners = new Set<Listener>()
   private buffers = new Map<string, AudioBuffer>()
   private blobs = new Map<string, Blob>()
+  private names = new Map<string, string>()
   private breathPattern: BreathPattern = 'none'
   private breathStart = 0
   private lastBreathStep: BreathStep = 'none'
@@ -194,7 +199,7 @@ export class SessionEngine {
   state: EngineState
 
   constructor(public plan: SessionPlan) {
-    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec }
+    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: plan.cues.filter((c) => c.layer === 'music' && c.asset).length, musicGain: 0.8 }
   }
 
   on(l: Listener) { this.listeners.add(l); return () => this.listeners.delete(l) }
@@ -222,7 +227,8 @@ export class SessionEngine {
       try { this.buffers.set(a.id, await ctx.decodeAudioData(await a.blob.arrayBuffer())) } catch (e) { console.warn('decode failed', a.name, e) }
     }))
     const music = await db.assets.bulkGet(musicIds)
-    music.forEach((a?: Asset) => { if (a) this.blobs.set(a.id, a.blob) })
+    music.forEach((a?: Asset) => { if (a) { this.blobs.set(a.id, a.blob); this.names.set(a.id, a.name) } })
+    this.state.musicGain = this.gains.music
     this.setupMediaSession()
   }
 
@@ -285,9 +291,13 @@ export class SessionEngine {
         const isAlbum = this.plan.mode === 'album'
         this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE)
         prev?.stop(isAlbum ? 1.5 : XFADE)
+        this.state.trackName = this.names.get(c.asset) ?? ''
+        this.state.trackNo = this.plan.cues.filter((x) => x.layer === 'music' && x.asset).indexOf(c) + 1
+        if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.title = this.state.trackName || 'המדריך'
       } else {
         this.current = new Drone(this.ctx, this.musicBus, this.state.phase, this.output, this.binaural)
         prev?.stop(XFADE)
+        this.state.trackName = ''
       }
     }
     if (c.layer === 'voice' && c.action === 'play' && c.asset && this.buffers.has(c.asset)) {
@@ -364,6 +374,30 @@ export class SessionEngine {
     this.emit()
   }
 
+  /** jump to next / previous music cue (album mode) */
+  nextTrack() { this.jumpTrack(1) }
+  prevTrack() { this.jumpTrack(-1) }
+  private jumpTrack(dir: 1 | -1) {
+    const music = this.plan.cues.filter((c) => c.layer === 'music' && c.asset)
+    if (!music.length) return
+    const t = this.elapsed - this.offset
+    let idx = music.findIndex((c, i) => t >= c.t && (i === music.length - 1 || t < music[i + 1].t))
+    if (idx < 0) idx = 0
+    // prev: if more than 5s into track, restart it
+    if (dir === -1 && t - music[idx].t > 5) { this.seek(music[idx].t); return }
+    const target = music[Math.max(0, Math.min(music.length - 1, idx + dir))]
+    this.seek(target.t)
+  }
+  seekPhase(n: Phase) {
+    const p = this.plan.phases.find((x) => x.n === n)
+    if (p) this.seek(p.startSec)
+  }
+  setMusicGain(v: number) {
+    this.gains.music = v; this.state.musicGain = v
+    if (this.ctx) this.musicBus.gain.setTargetAtTime(v, this.ctx.currentTime, 0.1)
+    this.emit()
+  }
+
   /** jump to the start of the return phase */
   skipToReturn() {
     const ret = this.plan.phases.find((p) => p.n === 4) ?? this.plan.phases[this.plan.phases.length - 1]
@@ -372,6 +406,7 @@ export class SessionEngine {
 
   private seek(planT: number) {
     if (!this.ctx) return
+    if (this.state.paused) { this.pausedAt = planT + this.offset }
     this.startCtxTime = this.ctx.currentTime - (planT + this.offset)
     this.cueIdx = 0
     // re-fire state cues up to planT without audio restarts except music

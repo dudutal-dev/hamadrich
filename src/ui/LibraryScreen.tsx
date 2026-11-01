@@ -9,7 +9,7 @@ export function LibraryScreen() {
   const [tab, setTab] = useState<Tab>('texts')
   return (
     <div className="fade-in flex flex-col gap-5 px-5 pt-10 pb-28">
-      <h1 className="text-[28px] font-light">ספרייה</h1>
+      <h1 className="text-[34px] font-normal title-psy">ספרייה</h1>
       <div className="flex gap-5 text-[15px] border-b border-ink/10">
         {(['texts', 'music', 'settings'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`pb-2 -mb-px border-b transition-all ${tab === t ? 'border-ink/70' : 'border-transparent opacity-70'}`}>{{ texts: 'טקסטים', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>

@@ -47,9 +47,9 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
   }
 
   return (
-    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto">
+    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto relative"><div className="bg-psy" />
       <div className="text-[13px] opacity-70 tracking-widest">אינטגרציה</div>
-      <h2 className="text-[24px] font-light leading-relaxed">{q}</h2>
+      <h2 className="text-[28px] font-normal leading-relaxed title-psy">{q}</h2>
 
       <button onClick={toggleRec} className={`self-start rounded-full px-6 py-3 border text-[15px] transition-all ${rec ? 'border-red-400/70 text-red-300' : 'border-ink/25'}`}>
         {rec ? '● מקליט… לחץ לסיום' : blob ? '✓ הוקלט · הקלט שוב' : 'הקלט תשובה'}
@@ -67,14 +67,17 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
       <div>
         <div className="text-[13px] opacity-70 mb-3">איך אתה מרגיש עכשיו?</div>
         <div className="flex justify-between max-w-xs">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} onClick={() => setMood(n)} className={`w-12 h-12 rounded-full border text-[15px] transition-all ${mood === n ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-75'}`}>{n}</button>
+          {[['1', 'כבד'], ['2', 'מתוח'], ['3', 'רגיל'], ['4', 'רגוע'], ['5', 'פתוח']].map(([n, l]) => (
+            <button key={n} onClick={() => setMood(+n)} className="flex flex-col items-center gap-1">
+              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all ${mood === +n ? 'border-[#FF5FC8] bg-[#FF5FC8]/25 shadow-[0_0_20px_-4px_#FF5FC8]' : 'border-ink/15 opacity-75'}`}>{n}</span>
+              <span className="text-[11px] opacity-60">{l}</span>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="mt-auto flex flex-col gap-3 pt-4">
-        <button onClick={save} className="rounded-2xl py-4 text-[17px] bg-ink text-bg">שמור</button>
+        <button onClick={save} className="rounded-2xl py-4 text-[17px] btn-psy">שמור ביומן</button>
         <button onClick={() => void db.journal.put(draft).then(onDone)} className="text-[15px] opacity-70 py-2">דלג</button>
       </div>
     </div>

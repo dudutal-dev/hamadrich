@@ -25,6 +25,24 @@ export function JournalScreen() {
     return { streak, weekMin, last30, topTags }
   }, [entries])
 
+  const clearAll = async () => {
+    if (!confirm('למחוק את כל רשומות היומן? ההקלטות יימחקו גם. לא ניתן לשחזר.')) return
+    const recs = entries.map((e) => e.recordingAssetId).filter(Boolean) as string[]
+    await db.assets.bulkDelete(recs)
+    await db.journal.clear()
+    setEntries([])
+  }
+  const delOne = async (e: JournalEntry) => {
+    if (!confirm('למחוק את הרשומה הזו?')) return
+    if (e.recordingAssetId) await db.assets.delete(e.recordingAssetId)
+    await db.journal.delete(e.id)
+    setEntries((x) => x.filter((y) => y.id !== e.id))
+  }
+  const playRec = async (e: JournalEntry) => {
+    if (!e.recordingAssetId) return
+    const a = await db.assets.get(e.recordingAssetId); if (!a) return
+    const url = URL.createObjectURL(a.blob); const au = new Audio(url); au.onended = () => URL.revokeObjectURL(url); void au.play()
+  }
   const exportMd = () => {
     const md = entries.map((e) => `## ${new Date(e.startedAt).toLocaleString('he-IL')} · ${MODE_META[e.mode].name} · ${Math.round(e.actualSec / 60)} דק'\nכוונה: ${e.intention}${e.moodBefore ? ` · לפני ${e.moodBefore}` : ''}${e.moodAfter ? ` · אחרי ${e.moodAfter}` : ''}\n${e.tags.length ? `תגיות: ${e.tags.join(', ')}\n` : ''}${e.transcript ? `\n${e.transcript}\n` : ''}${e.note ? `\n${e.note}\n` : ''}`).join('\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' })); a.download = 'hamadrich-journal.md'; a.click()
@@ -33,8 +51,14 @@ export function JournalScreen() {
   return (
     <div className="fade-in flex flex-col gap-6 px-5 pt-10 pb-28">
       <header className="flex items-end justify-between">
-        <h1 className="text-[28px] font-light">יומן</h1>
-        <button onClick={exportMd} className="text-[13px] opacity-70">ייצוא</button>
+        <div>
+          <h1 className="text-[34px] font-normal title-psy">יומן</h1>
+          <p className="text-[14px] opacity-70">{entries.length ? `${entries.length} מסעות` : 'המסע הראשון שלך יופיע כאן'}</p>
+        </div>
+        <div className="flex gap-4 text-[13px] opacity-80">
+          {entries.length > 0 && <button onClick={exportMd}>ייצוא</button>}
+          {entries.length > 0 && <button onClick={clearAll} className="text-red-300/80">ניקוי</button>}
+        </div>
       </header>
 
       <div className="grid grid-cols-2 gap-3">
@@ -68,10 +92,23 @@ export function JournalScreen() {
               <span className="opacity-70 text-[13px]">{new Date(e.startedAt).toLocaleDateString('he-IL')}</span>
             </div>
             <div className="text-[13px] opacity-70 mt-1">{e.intention}{e.tags.length ? ` · ${e.tags.join(' · ')}` : ''}{e.moodBefore && e.moodAfter ? ` · ${e.moodBefore}→${e.moodAfter}` : ''}{!e.completed ? ' · הופסק' : ''}</div>
-            {open === e.id && (e.transcript || e.note) && <p className="text-[15px] leading-relaxed mt-3 opacity-80">{e.transcript}{e.transcript && e.note ? '\n' : ''}{e.note}</p>}
+            {open === e.id && (
+              <div className="mt-3 flex flex-col gap-3">
+                {(e.transcript || e.note) && <p className="text-[15px] leading-relaxed opacity-85 whitespace-pre-line">{e.transcript}{e.transcript && e.note ? '\n' : ''}{e.note}</p>}
+                <div className="flex gap-5 text-[13px] opacity-75">
+                  {e.recordingAssetId && <button onClick={(ev) => { ev.stopPropagation(); void playRec(e) }}>▶ הקלטה</button>}
+                  <button onClick={(ev) => { ev.stopPropagation(); void delOne(e) }} className="text-red-300/80">מחק</button>
+                </div>
+              </div>
+            )}
           </li>
         ))}
-        {!entries.length && <li className="opacity-70 text-[15px]">עדיין אין סשנים. היומן מתחיל במסע הראשון.</li>}
+        {!entries.length && (
+          <li className="card rounded-3xl p-6 text-center">
+            <div className="text-[40px] mb-2">☾</div>
+            <p className="text-[15px] opacity-80 leading-relaxed">אחרי כל מסע תענה על שאלה אחת, תקליט או תכתוב, ותסמן איך הרגשת. כאן תראה לאורך זמן מה חוזר.</p>
+          </li>
+        )}
       </ul>
     </div>
   )

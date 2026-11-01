@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Settings } from '../db'
+import type { Phase, Settings } from '../db'
 import { type EngineState, type SessionEngine, BREATH_PATTERNS } from '../engine/audio'
-import { PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
+import { PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
+import { Cosmos } from './Cosmos'
 import { Orb } from './Orb'
 
 const BREATH_WORD = { inhale: 'שאיפה', hold: 'החזק', exhale: 'נשיפה', hold2: 'החזק', none: '' } as const
+const fmt = (sec: number) => `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toString().padStart(2, '0')}`
 
 export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngine; settings: Settings; onEnd: (actualSec: number, completed: boolean) => void }) {
   const [s, setS] = useState<EngineState>(engine.state)
@@ -15,14 +17,16 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const [hint, setHint] = useState(true)
   const pressStart = useRef(0)
   const touchY = useRef(0)
+  const wasAsleep = useRef(false)
   const wakeLock = useRef<WakeLockSentinel | null>(null)
   const endedRef = useRef(false)
+  const isAlbum = engine.plan.mode === 'album'
 
   useEffect(() => { const off = engine.on(setS); return () => { off() } }, [engine])
   useEffect(() => { const id = setTimeout(() => setHint(false), 9000); return () => clearTimeout(id) }, [])
   useEffect(() => {
     if (!awake) return
-    const id = setTimeout(() => setAwake(false), 10000)
+    const id = setTimeout(() => setAwake(false), 12000)
     return () => clearTimeout(id)
   }, [awake])
   useEffect(() => {
@@ -37,16 +41,15 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
 
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2200) }
   const exit = () => { engine.stop(); onEnd(Math.round(s.t), false) }
+  const isUI = (e: React.PointerEvent) => !!(e.target as HTMLElement).closest('button, input, [data-ui]')
 
-  const wasAsleep = useRef(false)
   const onDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return
+    if (isUI(e)) return
     wasAsleep.current = !awake
     setAwake(true); pressStart.current = Date.now(); touchY.current = e.clientY
   }
   const onUp = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return
-    if (!pressStart.current) return
+    if (isUI(e) || !pressStart.current) return
     const held = Date.now() - pressStart.current; pressStart.current = 0
     const dy = touchY.current - e.clientY
     if (emergency || confirmExit) return
@@ -60,11 +63,12 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const color = PHASE_COLORS[s.phase], color2 = PHASE_COLORS2[s.phase]
   const progress = Math.min(1, s.t / s.durationSec)
   const remaining = Math.max(0, s.durationSec - s.t)
-  const mm = Math.floor(remaining / 60), ss = Math.floor(remaining % 60)
   const pat = BREATH_PATTERNS[s.breathPattern]
   const stepSec = s.breath === 'inhale' ? pat.inhale : s.breath === 'exhale' ? pat.exhale : s.breath === 'hold' ? pat.hold : pat.hold2
+  const breathIntensity = s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.phase === 3 ? 0.7 : 0.4
   const peak = s.phase === 3 && !s.paused
   const dimAll = peak && !awake
+  const ui = { opacity: awake ? 1 : 0.3, transition: 'opacity 1200ms' }
 
   if (emergency) {
     return (
@@ -82,45 +86,81 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
 
   return (
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
-      className="h-full relative flex flex-col items-center justify-center select-none touch-none overflow-hidden"
-      style={{ background: '#0E0B18', transition: 'background 2000ms' }}>
-      {/* aurora layers */}
-      <div className="aurora" style={{ ['--c1' as string]: color, ['--c2' as string]: color2, opacity: peak ? 0.55 : 0.9, transition: 'opacity 3000ms' }} />
+      className="h-full relative flex flex-col items-center select-none touch-none overflow-hidden" style={{ background: '#070510' }}>
+      <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} />
 
-      {/* top controls */}
-      <div className="absolute top-0 right-0 left-0 flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={{ opacity: awake ? 1 : 0.35, transition: 'opacity 1200ms' }}>
-        <button onClick={() => setConfirmExit(true)} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/50 backdrop-blur text-[20px] leading-none">✕</button>
-        <div className="text-[13px] tracking-[0.3em]" style={{ color: color2 }}>{s.phaseName}</div>
-        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/50 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
+      {/* top bar */}
+      <div className="relative w-full flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={ui}>
+        <button onClick={() => setConfirmExit(true)} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/40 backdrop-blur text-[20px] leading-none">✕</button>
+        <div className="text-center">
+          <div className="text-[13px] tracking-[0.3em]" style={{ color: color2, textShadow: `0 0 12px ${color2}` }}>{s.phaseName}</div>
+          <div className="text-[12px] opacity-60 mt-0.5">{engine.plan.intention}</div>
+        </div>
+        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/40 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
       </div>
 
-      <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} />
+      {/* center */}
+      <div className="relative flex-1 flex flex-col items-center justify-start pt-6">
+        <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={290} />
+        <div className="h-20 mt-8 flex flex-col items-center" style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
+          {s.breath !== 'none' && !s.paused ? (
+            <>
+              <div className="text-[28px] font-light tracking-wide" style={{ textShadow: `0 0 28px ${color2}` }}>{BREATH_WORD[s.breath]}</div>
+              <div className="text-[13px] opacity-60 mt-1">{pat.label}</div>
+            </>
+          ) : (
+            <div className="text-[20px] font-light opacity-85 tabular-nums">{s.paused ? 'עצירה' : s.done ? 'המסע נגמר' : fmt(remaining)}</div>
+          )}
+        </div>
+      </div>
 
-      <div className="h-20 mt-12 flex flex-col items-center" style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
-        {s.breath !== 'none' && !s.paused ? (
-          <>
-            <div className="text-[26px] font-light tracking-wide" style={{ textShadow: `0 0 24px ${color2}88` }}>{BREATH_WORD[s.breath]}</div>
-            <div className="text-[13px] opacity-55 mt-1">{pat.label} · {mm}:{ss.toString().padStart(2, '0')}</div>
-          </>
-        ) : (
-          <div className="text-[17px] opacity-70 tabular-nums">{s.paused ? 'עצירה' : `${mm}:${ss.toString().padStart(2, '0')}`}</div>
-        )}
+      {/* player */}
+      <div data-ui className="relative w-full px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] flex flex-col gap-3" style={ui} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+        {/* phase strip (tap to jump) */}
+        <div className="flex gap-1 h-2.5 rounded-full overflow-hidden">
+          {engine.plan.phases.map((p) => {
+            const len = (p.endSec - p.startSec) / engine.plan.durationSec
+            const fill = Math.max(0, Math.min(1, (s.t - p.startSec) / (p.endSec - p.startSec)))
+            return (
+              <button key={p.n} onClick={() => engine.seekPhase(p.n as Phase)} style={{ flex: len }} className="relative h-full rounded-full overflow-hidden bg-white/10" title={PHASE_NAMES[p.n]}>
+                <div className="absolute inset-y-0 right-0" style={{ width: `${fill * 100}%`, background: `linear-gradient(90deg, ${PHASE_COLORS[p.n]}, ${PHASE_COLORS2[p.n]})` }} />
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[12px] opacity-70 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{engine.plan.phases.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
+
+        {/* track + transport */}
+        <div className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(14,11,24,0.55)', border: '1px solid rgba(242,238,230,0.12)', backdropFilter: 'blur(14px)' }}>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] truncate">{s.trackName || (isAlbum ? '…' : 'דרון מובנה')}</div>
+            <div className="text-[12px] opacity-60">{isAlbum && s.trackCount ? `רצועה ${s.trackNo} מתוך ${s.trackCount}` : `${PHASE_NAMES[s.phase]} · ${engine.plan.mode === 'breath' ? 'נשימה' : engine.plan.intention}`}</div>
+          </div>
+          {isAlbum && <button onClick={() => engine.prevTrack()} className="w-10 h-10 rounded-full text-[18px] opacity-85">⏮</button>}
+          <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full text-[18px]" style={{ background: `linear-gradient(135deg, ${color2}, ${color})`, color: '#0E0B18' }}>{s.paused ? '▶' : '❚❚'}</button>
+          {isAlbum && <button onClick={() => engine.nextTrack()} className="w-10 h-10 rounded-full text-[18px] opacity-85">⏭</button>}
+          <button onClick={() => { engine.extend(600); flash('עוד עשר דקות') }} className="text-[12px] px-2 py-1 rounded-full border border-ink/25">+10</button>
+        </div>
+        <div className="flex items-center gap-3 px-1">
+          <span className="text-[14px] opacity-60">🔈</span>
+          <input type="range" min={0} max={1} step={0.02} value={s.musicGain} onChange={(e) => engine.setMusicGain(+e.target.value)} className="flex-1" />
+          <span className="text-[14px] opacity-60">🔊</span>
+        </div>
       </div>
 
       {hint && !s.done && (
-        <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+28px)] text-center text-[13px] opacity-60 leading-relaxed px-8">
-          נגיעה – עצירה · לחיצה ארוכה – עוד 10 דקות · החלקה למעלה – לחזרה · 3 שניות – חירום
+        <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+190px)] text-center text-[12px] opacity-70 leading-relaxed px-10" style={{ textShadow: '0 1px 8px #000' }}>
+          נגיעה במרכז – עצירה · לחיצה ארוכה – +10 דק' · החלקה למעלה – לחזרה · 3 שניות – חירום
         </div>
       )}
-      {s.done && <div className="fade-in text-[19px] opacity-80 mt-4">המסע נגמר</div>}
-      {toast && <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+70px)] text-[15px] opacity-80">{toast}</div>}
+      {toast && <div className="fade-in absolute top-[calc(env(safe-area-inset-top)+70px)] text-[15px] px-4 py-2 rounded-full" style={{ background: 'rgba(14,11,24,0.6)', backdropFilter: 'blur(10px)' }}>{toast}</div>}
 
       {confirmExit && (
-        <div className="absolute inset-0 bg-bg/85 backdrop-blur flex flex-col items-center justify-center px-8 gap-4 fade-in" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-          <p className="text-[19px] text-center">לסיים את המסע עכשיו?</p>
-          <button onClick={exit} className="w-full rounded-2xl py-4 bg-ink text-bg text-[17px]">סיים ועבור ליומן</button>
+        <div className="absolute inset-0 z-20 bg-bg/85 backdrop-blur-xl flex flex-col items-center justify-center px-8 gap-3 fade-in" data-ui onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+          <p className="text-[20px] text-center mb-2">לסיים את המסע עכשיו?</p>
+          <button onClick={exit} className="w-full rounded-2xl py-4 btn-psy text-[17px]">סיים ועבור ליומן</button>
           <button onClick={() => { engine.skipToReturn(); setConfirmExit(false) }} className="w-full rounded-2xl py-4 border border-ink/30 text-[17px]">דלג לשלב החזרה</button>
-          <button onClick={() => setConfirmExit(false)} className="text-[15px] opacity-70 py-2">המשך במסע</button>
+          <button onClick={() => setConfirmExit(false)} className="text-[15px] opacity-70 py-3">המשך במסע</button>
         </div>
       )}
     </div>
