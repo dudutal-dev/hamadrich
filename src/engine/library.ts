@@ -2,26 +2,18 @@ import { type Album, type Asset, type Phase, type TextItem, db, uid } from '../d
 import { defaultAlbumPhaseMap } from './plan'
 import JSZip from 'jszip'
 
-/** Measure audio duration via a temporary AudioContext (works offline) */
-export async function measureDuration(blob: Blob): Promise<number> {
-  try {
-    const ctx = new OfflineAudioContext(1, 1, 44100)
-    const buf = await ctx.decodeAudioData(await blob.arrayBuffer())
-    return Math.round(buf.duration)
-  } catch {
-    return 0
-  }
-}
-
-/** Import loose music files, tagged to the given phases */
-export async function importMusic(files: File[], phases: Phase[]): Promise<Asset[]> {
-  const out: Asset[] = []
-  for (const f of files) {
-    const a: Asset = { id: uid(), kind: 'music', name: f.name.replace(/\.[^.]+$/, ''), blob: f, mime: f.type || 'audio/mpeg', durationSec: await measureDuration(f), phases, gainDb: 0, createdAt: new Date().toISOString() }
-    await db.assets.add(a)
-    out.push(a)
-  }
-  return out
+/** Measure audio duration via a media element (metadata only, no full decode) */
+export function measureDuration(blob: Blob): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob)
+    const el = new Audio()
+    el.preload = 'metadata'
+    const done = (v: number) => { URL.revokeObjectURL(url); el.src = ''; resolve(v) }
+    el.onloadedmetadata = () => done(isFinite(el.duration) ? Math.round(el.duration) : 0)
+    el.onerror = () => done(0)
+    setTimeout(() => done(0), 8000)
+    el.src = url
+  })
 }
 
 /** Expand ZIP files into their audio entries; pass other files through */

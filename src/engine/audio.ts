@@ -138,28 +138,34 @@ class Drone {
   }
 }
 
+/** Streaming track: HTMLAudioElement → MediaElementSource. No full decode, so 55 tracks don't blow up RAM. */
 class Track {
-  private src: AudioBufferSourceNode
+  private el: HTMLAudioElement
+  private src: MediaElementAudioSourceNode
   private gain: GainNode
-  constructor(private ctx: AudioContext, out: AudioNode, buffer: AudioBuffer, loop: boolean, gainDb: number, fadeIn: number) {
-    this.gain = ctx.createGain()
-    this.gain.gain.value = 0
-    this.gain.connect(out)
-    this.src = ctx.createBufferSource()
-    this.src.buffer = buffer
-    this.src.loop = loop
-    if (loop) { this.src.loopStart = 1; this.src.loopEnd = Math.max(2, buffer.duration - 1) }
+  private url: string
+  constructor(private ctx: AudioContext, out: AudioNode, blob: Blob, loop: boolean, gainDb: number, fadeIn: number) {
+    this.url = URL.createObjectURL(blob)
+    this.el = new Audio()
+    this.el.src = this.url
+    this.el.loop = loop
+    this.el.preload = 'auto'
+    this.el.crossOrigin = 'anonymous'
+    this.gain = ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(out)
+    this.src = ctx.createMediaElementSource(this.el)
     this.src.connect(this.gain)
-    this.src.start()
     const target = Math.pow(10, gainDb / 20)
+    void this.el.play().catch((e) => console.warn('track play failed', e))
     this.gain.gain.linearRampToValueAtTime(target, ctx.currentTime + fadeIn)
   }
+  pause() { this.el.pause() }
+  resume() { void this.el.play().catch(() => {}) }
   stop(fade: number) {
     const t = this.ctx.currentTime
     this.gain.gain.cancelScheduledValues(t)
     this.gain.gain.setValueAtTime(this.gain.gain.value, t)
     this.gain.gain.linearRampToValueAtTime(0, t + fade)
-    setTimeout(() => { try { this.src.stop() } catch { /* */ } this.gain.disconnect() }, fade * 1000 + 100)
+    setTimeout(() => { this.el.pause(); this.el.src = ''; this.src.disconnect(); this.gain.disconnect(); URL.revokeObjectURL(this.url) }, fade * 1000 + 100)
   }
 }
 
@@ -177,6 +183,7 @@ export class SessionEngine {
   private raf = 0
   private listeners = new Set<Listener>()
   private buffers = new Map<string, AudioBuffer>()
+  private blobs = new Map<string, Blob>()
   private breathPattern: BreathPattern = 'none'
   private breathStart = 0
   private lastBreathStep: BreathStep = 'none'
@@ -206,13 +213,16 @@ export class SessionEngine {
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.gains.music; this.musicBus.connect(this.master)
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.gains.voice; this.voiceBus.connect(this.master)
     this.breathBus = ctx.createGain(); this.breathBus.gain.value = this.gains.breath; this.breathBus.connect(this.master)
-    // preload assets
-    const ids = [...new Set(this.plan.cues.map((c) => c.asset).filter(Boolean) as string[])]
-    const assets = await db.assets.bulkGet(ids)
-    await Promise.all(assets.map(async (a?: Asset) => {
+    // preload: voice cues are decoded (short); music stays as blobs and streams
+    const voiceIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'voice' && c.asset).map((c) => c.asset as string))]
+    const musicIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'music' && c.asset).map((c) => c.asset as string))]
+    const voices = await db.assets.bulkGet(voiceIds)
+    await Promise.all(voices.map(async (a?: Asset) => {
       if (!a) return
       try { this.buffers.set(a.id, await ctx.decodeAudioData(await a.blob.arrayBuffer())) } catch (e) { console.warn('decode failed', a.name, e) }
     }))
+    const music = await db.assets.bulkGet(musicIds)
+    music.forEach((a?: Asset) => { if (a) this.blobs.set(a.id, a.blob) })
     this.setupMediaSession()
   }
 
@@ -271,9 +281,9 @@ export class SessionEngine {
     }
     if (c.layer === 'music' && c.action === 'play') {
       const prev = this.current
-      if (c.asset && this.buffers.has(c.asset)) {
+      if (c.asset && this.blobs.has(c.asset)) {
         const isAlbum = this.plan.mode === 'album'
-        this.current = new Track(this.ctx, this.musicBus, this.buffers.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE)
+        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE)
         prev?.stop(isAlbum ? 1.5 : XFADE)
       } else {
         this.current = new Drone(this.ctx, this.musicBus, this.state.phase, this.output, this.binaural)
@@ -332,6 +342,7 @@ export class SessionEngine {
     this.pausedAt = this.elapsed
     this.state.paused = true
     cancelAnimationFrame(this.raf)
+    if (this.current instanceof Track) this.current.pause()
     void this.ctx?.suspend()
     this.emit()
   }
@@ -341,6 +352,7 @@ export class SessionEngine {
     void this.ctx.resume().then(() => {
       this.startCtxTime = this.ctx!.currentTime - this.pausedAt
       this.state.paused = false
+      if (this.current instanceof Track) this.current.resume()
       this.tick()
     })
   }
