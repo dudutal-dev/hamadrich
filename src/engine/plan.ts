@@ -1,3 +1,4 @@
+import { breathWindowsFor } from './albumBreath'
 import { type Album, type Asset, type BreathPattern, type Cue, type Mode, type Phase, type PhaseSpan, type SessionPlan, type TextItem, uid } from '../db'
 
 export const PHASE_NAMES: Record<Phase, string> = {
@@ -183,10 +184,20 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
       if (curPhase !== null) phases[phases.length - 1].endSec = t
       phases.push({ n: p, startSec: t, endSec: t })
       cues.push({ t, layer: 'visual', action: 'phase', phase: p })
-      cues.push({ t, layer: 'breath', action: 'pattern', pattern: input.breathEnabled && (p === 1 || p === 2 || p === 4) ? (p === 1 ? '478' : 'coherent') : 'none' })
+      cues.push({ t, layer: 'breath', action: 'pattern', pattern: 'none' })
       curPhase = p
     }
     cues.push({ t, layer: 'music', action: 'play', asset: tr.id })
+    // synced breath: only inside this track's instrumental windows (no narration), pattern by phase; never in the peak
+    if (input.breathEnabled && p !== 3) {
+      const wins = breathWindowsFor(tr.trackNo, tr.durationSec) ?? []
+      const pattern: BreathPattern = p === 1 ? '478' : 'coherent'
+      for (const [a, b] of wins) {
+        if (b - a < 11) continue
+        cues.push({ t: t + a + 1, layer: 'breath', action: 'pattern', pattern })
+        cues.push({ t: t + b - 1, layer: 'breath', action: 'pattern', pattern: 'none' })
+      }
+    }
     t += tr.durationSec
   }
   if (phases.length) phases[phases.length - 1].endSec = t
