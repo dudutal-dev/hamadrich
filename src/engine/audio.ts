@@ -182,6 +182,8 @@ class Track {
   duck(factor: number, sec: number) { if (this.direct) this.fadeTo(this.target * this.busGain * factor, sec) }
   pause() { this.el.pause() }
   resume() { void this.el.play().catch(() => {}) }
+  /** iOS may have paused the element while backgrounded; if we are supposed to be playing, play again */
+  kick() { if (this.el.paused && !this.el.ended && this.el.src) void this.el.play().catch(() => {}) }
   get ended() { return this.el.ended }
   stop(fade: number) {
     if (this.direct) { this.fadeTo(0, fade) } else if (this.gain) {
@@ -250,6 +252,16 @@ export class SessionEngine {
     music.forEach((a?: Asset) => { if (a) { this.blobs.set(a.id, a.blob); this.names.set(a.id, a.name) } })
     this.state.musicGain = this.gains.music
     this.setupMediaSession()
+    document.addEventListener('visibilitychange', this.onVisibility)
+  }
+
+  private onVisibility = () => {
+    if (!this.ctx || !this.state.running || this.state.paused) return
+    if (document.visibilityState === 'visible') {
+      void this.ctx.resume()
+      if (this.current instanceof Track) this.current.kick()
+      this.tick()
+    }
   }
 
   private setupMediaSession() {
@@ -269,7 +281,7 @@ export class SessionEngine {
     this.tick()
     this.keepAlive()
     // rAF stops in background; a coarse interval keeps cues firing (track changes) while the screen is off
-    this.ivl = window.setInterval(() => { if (this.state.running && !this.state.paused && document.hidden) this.tick() }, 1000)
+    this.ivl = window.setInterval(() => { if (!this.state.running || this.state.paused) return; if (this.current instanceof Track) this.current.kick(); if (document.hidden) this.tick() }, 1000)
   }
 
   /** silent looping buffer keeps iOS audio session alive in background */
@@ -304,6 +316,7 @@ export class SessionEngine {
 
   private fire(c: Cue) {
     if (!this.ctx) return
+    if (c.layer === 'music' && c.action === 'play' && this.state.paused) return
     if (c.layer === 'visual' && c.action === 'phase' && c.phase) {
       this.state.phase = c.phase; this.state.phaseName = PHASE_NAMES[c.phase]
       if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.artist = PHASE_NAMES[c.phase]
@@ -312,7 +325,7 @@ export class SessionEngine {
       const prev = this.current
       if (c.asset && this.blobs.has(c.asset)) {
         const isAlbum = this.plan.mode === 'album'
-        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, isAlbum, this.gains.music)
+        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music)
         prev?.stop(isAlbum ? 1.5 : XFADE)
         this.state.trackName = this.names.get(c.asset) ?? ''
         this.state.trackNo = this.plan.cues.filter((x) => x.layer === 'music' && x.asset).indexOf(c) + 1
@@ -464,6 +477,7 @@ export class SessionEngine {
 
   stop() {
     this.state.running = false
+    document.removeEventListener('visibilitychange', this.onVisibility)
     cancelAnimationFrame(this.raf); clearInterval(this.ivl)
     this.current?.stop(2)
     setTimeout(() => { void this.ctx?.close() }, 2500)
