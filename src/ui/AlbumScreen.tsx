@@ -17,7 +17,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [album, setAlbum] = useState<Album | null>(null)
   const [tracks, setTracks] = useState<Asset[]>([])
   const [intention, setIntention] = useState('שקט')
-  const [breath, setBreath] = useState(true)
+  const [breath, setBreath] = useState(false)
   const [openPhase, setOpenPhase] = useState<Phase | null>(null)
   const [editing, setEditing] = useState(false)
   const [preview, setPreview] = useState<{ id: string; el: HTMLAudioElement } | null>(null)
@@ -93,7 +93,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
             <button key={i} onClick={() => setIntention(i)} className="px-4 py-2 rounded-full text-[14px] transition-all" style={{ background: intention === i ? '#FF5FC833' : 'rgba(255,255,255,0.05)', border: `1px solid ${intention === i ? '#FF5FC8AA' : 'rgba(242,238,230,0.12)'}` }}>{INTENTION_META[i].icon} {i}</button>
           ))}
         </div>
-        <label className="flex items-center justify-between mt-4 text-[15px]"><div><div>הנחיית נשימה</div><div className="text-[12px] opacity-60">אורב וצלילי נשימה בהגעה, שחרור וחזרה – מעל הקריינות</div></div><input type="checkbox" checked={breath} onChange={(e) => setBreath(e.target.checked)} /></label>
+        <label className="flex items-center justify-between mt-4 text-[15px]"><div><div>הנחיית נשימה</div><div className="text-[12px] opacity-60">כבוי כברירת מחדל – הנשימה אינה מסונכרנת לקריינות של סוסייה. הפעל אם אתה מעדיף הנחיה גם בפרקי ההגעה, השחרור והחזרה.</div></div><input type="checkbox" checked={breath} onChange={(e) => setBreath(e.target.checked)} /></label>
       </section>
 
       <button onClick={() => start()} className="rounded-2xl py-4 text-[18px] btn-psy">המסע המלא · {Math.round(album.totalSec / 60)} דק'</button>
