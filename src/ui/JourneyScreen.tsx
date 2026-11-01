@@ -68,7 +68,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const breathIntensity = s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.phase === 3 ? 0.7 : 0.4
   const peak = s.phase === 3 && !s.paused
   const dimAll = peak && !awake
-  const ui = { opacity: awake ? 1 : 0.3, transition: 'opacity 1200ms' }
+  const ui = { opacity: awake ? 1 : 0.6, transition: 'opacity 1200ms' }
 
   if (emergency) {
     return (
