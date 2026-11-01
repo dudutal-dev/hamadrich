@@ -25,6 +25,10 @@ export default function App() {
   const [startedAt, setStartedAt] = useState('')
 
   useEffect(() => { void ensureSeed(); void getSettings().then(setSettings) }, [])
+  useEffect(() => {
+    document.body.dataset.journey = stage === 'journey' ? '1' : '0'
+    if (stage !== 'journey') window.dispatchEvent(new Event('hamadrich:idle'))
+  }, [stage])
 
   const onStart = async (c: StartChoice) => {
     setChoice(c)
