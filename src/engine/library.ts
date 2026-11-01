@@ -16,6 +16,17 @@ export function measureDuration(blob: Blob): Promise<number> {
   })
 }
 
+/** Import loose music files (or ZIPs of them), tagged to the given phases */
+export async function importMusic(files: File[], phases: Phase[]): Promise<Asset[]> {
+  const out: Asset[] = []
+  for (const f of await expandZips(files)) {
+    const a: Asset = { id: uid(), kind: 'music', name: f.name.replace(/\.[^.]+$/, ''), blob: f, mime: f.type || 'audio/mpeg', durationSec: await measureDuration(f), phases, gainDb: 0, createdAt: new Date().toISOString() }
+    await db.assets.add(a)
+    out.push(a)
+  }
+  return out
+}
+
 /** Expand ZIP files into their audio entries; pass other files through */
 export async function expandZips(files: File[], onProgress?: (msg: string) => void): Promise<File[]> {
   const out: File[] = []
