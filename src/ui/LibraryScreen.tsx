@@ -127,8 +127,8 @@ function Music() {
 
   const onAlbum = async (files: FileList | null) => {
     if (!files?.length) return
-    setBusy(`מייבא ${files.length} רצועות…`)
-    await importAlbum([...files], albumName || 'אלבום')
+    setBusy('מתחיל…')
+    try { await importAlbum([...files], albumName || 'אלבום', setBusy) } catch (e) { setBusy('שגיאה: ' + String(e)); return }
     setBusy(''); await reload()
   }
   const onLoose = async (files: FileList | null) => {
@@ -140,10 +140,10 @@ function Music() {
     <div className="flex flex-col gap-5">
       <section className="card rounded-2xl p-4 flex flex-col gap-3">
         <div className="text-[17px]">אלבום כמסע</div>
-        <p className="text-[13px] opacity-75 leading-relaxed">בחר את כל קבצי האלבום בבת אחת (MP3 מ-Bandcamp). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
+        <p className="text-[13px] opacity-75 leading-relaxed">בחר את קובץ ה-ZIP שהורדת מ-Bandcamp (או את כל ה-MP3 בבת אחת). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
         <input value={albumName} onChange={(e) => setAlbumName(e.target.value)} className="bg-transparent border-b border-ink/15 py-1 text-[15px] outline-none" />
-        <input ref={albumInput} type="file" accept="audio/*" multiple hidden onChange={(e) => onAlbum(e.target.files)} />
-        <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 border border-ink/25 text-[15px]">בחר קבצים</button>
+        <input ref={albumInput} type="file" accept="audio/*,.zip,application/zip" multiple hidden onChange={(e) => onAlbum(e.target.files)} />
+        <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 border border-ink/25 text-[15px]">בחר ZIP או קבצים</button>
         {albums.map((a) => (
           <div key={a.id} className="flex justify-between items-center text-[15px] pt-2 border-t border-ink/10">
             <span>{a.name} · {a.trackCount} רצועות · {Math.round(a.totalSec / 60)} דק'</span>

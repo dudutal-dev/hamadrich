@@ -1,5 +1,6 @@
 import { type Album, type Asset, type Phase, type TextItem, db, uid } from '../db'
 import { defaultAlbumPhaseMap } from './plan'
+import JSZip from 'jszip'
 
 /** Measure audio duration via a temporary AudioContext (works offline) */
 export async function measureDuration(blob: Blob): Promise<number> {
@@ -23,14 +24,37 @@ export async function importMusic(files: File[], phases: Phase[]): Promise<Asset
   return out
 }
 
+/** Expand ZIP files into their audio entries; pass other files through */
+export async function expandZips(files: File[], onProgress?: (msg: string) => void): Promise<File[]> {
+  const out: File[] = []
+  for (const f of files) {
+    const isZip = /\.zip$/i.test(f.name) || f.type === 'application/zip' || f.type === 'application/x-zip-compressed'
+    if (!isZip) { out.push(f); continue }
+    onProgress?.('פותח ZIP…')
+    const zip = await JSZip.loadAsync(f)
+    const entries = Object.values(zip.files).filter((e) => !e.dir && /\.(mp3|m4a|aac|wav|ogg|flac|aif|aiff)$/i.test(e.name) && !e.name.includes('__MACOSX'))
+    let i = 0
+    for (const e of entries) {
+      onProgress?.(`מחלץ ${++i}/${entries.length}…`)
+      const blob = await e.async('blob')
+      const name = e.name.split('/').pop() ?? e.name
+      const mime = /\.mp3$/i.test(name) ? 'audio/mpeg' : /\.(m4a|aac)$/i.test(name) ? 'audio/mp4' : /\.wav$/i.test(name) ? 'audio/wav' : /\.ogg$/i.test(name) ? 'audio/ogg' : 'audio/*'
+      out.push(new File([blob], name, { type: mime }))
+    }
+  }
+  return out
+}
+
 /** Import a whole album: files sorted by leading track number in filename, phases from default map */
-export async function importAlbum(files: File[], name: string): Promise<Album> {
-  const sorted = [...files].sort((a, b) => trackNoOf(a.name) - trackNoOf(b.name) || a.name.localeCompare(b.name))
+export async function importAlbum(files: File[], name: string, onProgress?: (msg: string) => void): Promise<Album> {
+  const expanded = await expandZips(files, onProgress)
+  const sorted = [...expanded].sort((a, b) => trackNoOf(a.name) - trackNoOf(b.name) || a.name.localeCompare(b.name))
   const albumId = uid()
   const phaseMap = defaultAlbumPhaseMap(sorted.length)
   let total = 0
   let i = 1
   for (const f of sorted) {
+    onProgress?.(`מייבא ${i}/${sorted.length}…`)
     const dur = await measureDuration(f)
     total += dur
     await db.assets.add({ id: uid(), kind: 'music', name: cleanName(f.name), blob: f, mime: f.type || 'audio/mpeg', durationSec: dur, phases: [phaseMap[i]], gainDb: 0, albumId, trackNo: i, createdAt: new Date().toISOString() })
