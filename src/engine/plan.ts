@@ -85,6 +85,10 @@ interface BuildInput {
   albumTracks?: Asset[]
   voiceEnabled: boolean
   breathEnabled: boolean
+  /** album: start from this track number (1-based); overrides duration shortening */
+  startTrackNo?: number
+  /** album: only play these phases (chapters) */
+  onlyPhases?: Phase[]
 }
 
 /** Pick texts for a phase, preferring intention match; returns ids in order */
@@ -151,7 +155,9 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
 
   // if shortening: keep tracks proportionally per phase
   let selected = tracks
-  if (target < total - 30) {
+  if (input.onlyPhases?.length) selected = tracks.filter((t) => input.onlyPhases!.includes(album.phaseMap[t.trackNo ?? 0] ?? 3))
+  if (input.startTrackNo) selected = selected.filter((t) => (t.trackNo ?? 0) >= input.startTrackNo!)
+  if (!input.onlyPhases?.length && !input.startTrackNo && target < total - 30) {
     const ratio = target / total
     const byPhase = new Map<Phase, Asset[]>()
     for (const t of tracks) {

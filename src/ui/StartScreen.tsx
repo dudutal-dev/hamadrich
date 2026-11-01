@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { type Album, type Mode, db } from '../db'
+import { type Album, type Mode, type Phase, db } from '../db'
 import { INTENTIONS, INTENTION_META, MODE_LONG, MODE_META, PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
 
-export interface StartChoice { mode: Mode; minutes: number; intention: string; voice: boolean; breath: boolean; albumId?: string }
+export interface StartChoice { mode: Mode; minutes: number; intention: string; voice: boolean; breath: boolean; albumId?: string; startTrackNo?: number; onlyPhases?: Phase[] }
 
 const MODE_ICON: Record<Mode, string> = { breath: '◌', meditation: '☾', deep: '✺', sleep: '☽', album: '♫' }
 const MODE_GRAD: Record<Mode, [string, string]> = {
@@ -31,7 +31,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const meta = MODE_META[mode]
   const maxMin = mode === 'album' && album ? Math.round(album.totalSec / 60) : meta.maxMin
   const pick = (m: Mode) => { setMode(m); setMinutes(m === 'album' && album ? Math.round(album.totalSec / 60) : MODE_META[m].defaultMin) }
-  const modes: Mode[] = [...(album ? (['album'] as Mode[]) : []), 'deep', 'meditation', 'breath', 'sleep']
+  const modes: Mode[] = ['deep', 'meditation', 'breath', 'sleep']
   const im = INTENTION_META[intention]
 
   return (
@@ -70,9 +70,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
             </div>
           )
         })}
-        {!album && (
-          <p className="text-[13px] opacity-60 leading-relaxed px-1">יש לך את האלבום Psychedelic Prayers? ייבא אותו בספרייה ← מוזיקה, והוא יופיע כאן כמסע שלם.</p>
-        )}
+        <p className="text-[13px] opacity-60 leading-relaxed px-1">{album ? 'מסע האלבום Psychedelic Prayers נמצא בלשונית "האלבום".' : 'יש לך את האלבום Psychedelic Prayers? ייבא אותו בספרייה ← מוזיקה, והוא יקבל פרק משלו.'}</p>
       </section>
 
       <section className="card rounded-3xl p-5">

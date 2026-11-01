@@ -9,8 +9,9 @@ import { JourneyScreen } from './ui/JourneyScreen'
 import { LibraryScreen } from './ui/LibraryScreen'
 import { PrepareScreen } from './ui/PrepareScreen'
 import { StartScreen, type StartChoice } from './ui/StartScreen'
+import { AlbumScreen } from './ui/AlbumScreen'
 
-type Tab = 'journey' | 'journal' | 'library'
+type Tab = 'journey' | 'album' | 'journal' | 'library'
 type Stage = 'start' | 'prepare' | 'journey' | 'integration'
 
 export default function App() {
@@ -36,7 +37,7 @@ export default function App() {
     const music = (await db.assets.where('kind').equals('music').toArray()).filter((a) => !a.albumId)
     const album = c.albumId ? await db.albums.get(c.albumId) : undefined
     const albumTracks = c.albumId ? await db.assets.where('albumId').equals(c.albumId).toArray() : undefined
-    const p = buildPlan({ mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, texts, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath })
+    const p = buildPlan({ mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, texts, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
     await db.plans.put(p)
     setPlan(p)
     setStage('prepare')
@@ -71,11 +72,12 @@ export default function App() {
     <div className="h-full overflow-y-auto">
       <div className="bg-psy" />
       {tab === 'journey' && <StartScreen onStart={onStart} />}
+      {tab === 'album' && <AlbumScreen onStart={onStart} />}
       {tab === 'journal' && <JournalScreen />}
       {tab === 'library' && <LibraryScreen />}
       <nav className="fixed bottom-0 right-0 left-0 flex justify-around py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-[#0E0B18]/80 backdrop-blur-xl border-t border-ink/10 text-[13px]">
-        {([['journey', 'מסע'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`px-6 py-1 transition-opacity ${tab === k ? 'opacity-100' : 'opacity-55'}`}>{l}</button>
+        {([['journey', 'מסע'], ['album', 'האלבום'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className={`px-4 py-1 transition-opacity ${tab === k ? 'opacity-100' : 'opacity-55'}`}>{l}</button>
         ))}
       </nav>
     </div>
