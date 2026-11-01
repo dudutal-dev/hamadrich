@@ -390,42 +390,63 @@ export class SessionEngine {
     return buf
   }
 
-  /** Realistic breath sound: filtered pink noise shaped like a human inhale (rising, opening) or exhale (falling, closing) */
+  /** Realistic breath: INHALE THROUGH THE NOSE (narrow, bright hiss with nasal resonance), EXHALE THROUGH THE MOUTH (wide, soft, low "hhh"). */
   private breathTone(step: BreathStep, dur: number) {
     if (!this.ctx || !dur) return
     const ctx = this.ctx, now = ctx.currentTime
     const src = ctx.createBufferSource(); src.buffer = this.getNoise(); src.loop = true
-    src.playbackRate.value = 0.9 + Math.random() * 0.2
-    // body: bandpass that sweeps – inhale brightens, exhale darkens
-    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9
-    // air: high shelf for the "hiss" of air through the nose/lips
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 180
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'
+    src.playbackRate.value = 0.92 + Math.random() * 0.16
     const g = ctx.createGain(); g.gain.value = 0
-    src.connect(hp); hp.connect(bp); bp.connect(lp); lp.connect(g); g.connect(this.breathBus)
-    const peak = step === 'inhale' ? 0.9 : 0.75
+    const nodes: AudioNode[] = []
+
     if (step === 'inhale') {
-      bp.frequency.setValueAtTime(500, now); bp.frequency.exponentialRampToValueAtTime(1900, now + dur * 0.85)
-      lp.frequency.setValueAtTime(1800, now); lp.frequency.exponentialRampToValueAtTime(5200, now + dur * 0.8)
-      // inhale: swells, peaks near the end, short release
+      // NOSE: two resonances (nasal cavity ~ 1.2k and ~2.8k), narrow, rising as the airflow increases
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700
+      const r1 = ctx.createBiquadFilter(); r1.type = 'bandpass'; r1.Q.value = 2.2
+      const r2 = ctx.createBiquadFilter(); r2.type = 'bandpass'; r2.Q.value = 3.0
+      const mix1 = ctx.createGain(); mix1.gain.value = 0.7
+      const mix2 = ctx.createGain(); mix2.gain.value = 0.55
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 6500
+      src.connect(hp); hp.connect(r1); hp.connect(r2); r1.connect(mix1); r2.connect(mix2); mix1.connect(lp); mix2.connect(lp); lp.connect(g)
+      r1.frequency.setValueAtTime(1000, now); r1.frequency.exponentialRampToValueAtTime(1450, now + dur * 0.8)
+      r2.frequency.setValueAtTime(2300, now); r2.frequency.exponentialRampToValueAtTime(3100, now + dur * 0.8)
+      // envelope: gradual swell, fullest near the end, quick close
+      const peak = 1.1
       g.gain.setValueAtTime(0.0001, now)
-      g.gain.exponentialRampToValueAtTime(peak * 0.45, now + dur * 0.3)
-      g.gain.exponentialRampToValueAtTime(peak, now + dur * 0.78)
+      g.gain.exponentialRampToValueAtTime(peak * 0.35, now + dur * 0.25)
+      g.gain.exponentialRampToValueAtTime(peak * 0.8, now + dur * 0.6)
+      g.gain.exponentialRampToValueAtTime(peak, now + dur * 0.85)
       g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+      nodes.push(hp, r1, r2, mix1, mix2, lp)
     } else {
-      bp.frequency.setValueAtTime(1500, now); bp.frequency.exponentialRampToValueAtTime(380, now + dur)
-      lp.frequency.setValueAtTime(4200, now); lp.frequency.exponentialRampToValueAtTime(1100, now + dur)
-      // exhale: quick onset, long gentle decay
+      // MOUTH: wide, breathy, dark. broad low-mid body + soft air; darkens as the lungs empty
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 120
+      const body = ctx.createBiquadFilter(); body.type = 'bandpass'; body.Q.value = 0.5
+      const air = ctx.createBiquadFilter(); air.type = 'bandpass'; air.Q.value = 0.8
+      const bg = ctx.createGain(); bg.gain.value = 0.9
+      const ag = ctx.createGain(); ag.gain.value = 0.35
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'
+      src.connect(hp); hp.connect(body); hp.connect(air); body.connect(bg); air.connect(ag); bg.connect(lp); ag.connect(lp); lp.connect(g)
+      body.frequency.setValueAtTime(650, now); body.frequency.exponentialRampToValueAtTime(260, now + dur)
+      air.frequency.setValueAtTime(2600, now); air.frequency.exponentialRampToValueAtTime(1400, now + dur)
+      lp.frequency.setValueAtTime(3800, now); lp.frequency.exponentialRampToValueAtTime(900, now + dur)
+      // envelope: soft rounded onset (lips open), long relaxed decay, trailing off
+      const peak = 1.0
       g.gain.setValueAtTime(0.0001, now)
-      g.gain.exponentialRampToValueAtTime(peak, now + Math.min(0.5, dur * 0.18))
-      g.gain.exponentialRampToValueAtTime(peak * 0.5, now + dur * 0.6)
+      g.gain.exponentialRampToValueAtTime(peak * 0.6, now + Math.min(0.45, dur * 0.12))
+      g.gain.exponentialRampToValueAtTime(peak, now + Math.min(1.0, dur * 0.25))
+      g.gain.exponentialRampToValueAtTime(peak * 0.55, now + dur * 0.6)
+      g.gain.exponentialRampToValueAtTime(peak * 0.2, now + dur * 0.88)
       g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+      nodes.push(hp, body, air, bg, ag, lp)
     }
-    // slight tremor like a real breath
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 5.5 + Math.random() * 2
-    const lg = ctx.createGain(); lg.gain.value = 0.08
+    g.connect(this.breathBus)
+    // micro-tremor of airflow
+    const lfo = ctx.createOscillator(); lfo.frequency.value = step === 'inhale' ? 7 + Math.random() * 2 : 4.5 + Math.random() * 1.5
+    const lg = ctx.createGain(); lg.gain.value = step === 'inhale' ? 0.06 : 0.05
     lfo.connect(lg); lg.connect(g.gain); lfo.start(now); lfo.stop(now + dur + 0.1)
     src.start(now); src.stop(now + dur + 0.1)
+    setTimeout(() => { nodes.forEach((n) => n.disconnect()); g.disconnect() }, (dur + 0.3) * 1000)
   }
 
   pause() {
