@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Cosmos } from './Cosmos'
 import type { Mode } from '../db'
 
 const LINES: Record<'short' | 'deep', string[]> = {
@@ -13,8 +14,8 @@ export function PrepareScreen({ mode, onBegin, onCancel, loading }: { mode: Mode
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % lines.length), 6000); return () => clearInterval(id) }, [lines.length])
 
   return (
-    <div className="fade-in h-full flex flex-col items-center justify-between px-6 pt-16 pb-10 text-center relative overflow-hidden">
-      <div className="bg-psy" />
+    <div className="fade-in h-full flex flex-col items-center justify-between px-6 pt-16 pb-10 text-center relative overflow-hidden" style={{ background: "#070510" }}>
+      <Cosmos color="#7B2FD6" color2="#FF5FC8" intensity={0.5} phase={3} paused={false} />
       <div className="relative">
         <div className="text-[13px] opacity-70 tracking-[0.3em]">הכנה</div>
         <p key={i} className="fade-in text-[20px] leading-relaxed mt-8 min-h-[4.5rem] max-w-[22rem]">{lines[i]}</p>

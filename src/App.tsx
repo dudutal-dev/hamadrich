@@ -10,6 +10,8 @@ import { LibraryScreen } from './ui/LibraryScreen'
 import { PrepareScreen } from './ui/PrepareScreen'
 import { StartScreen, type StartChoice } from './ui/StartScreen'
 import { AlbumScreen } from './ui/AlbumScreen'
+import { Cosmos } from './ui/Cosmos'
+import { NavIcon } from './ui/NavIcon'
 
 type Tab = 'journey' | 'album' | 'journal' | 'library'
 type Stage = 'start' | 'prepare' | 'journey' | 'integration'
@@ -69,16 +71,26 @@ export default function App() {
   if (stage === 'integration' && draft) return <IntegrationScreen draft={draft} onDone={reset} />
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="bg-psy" />
-      {tab === 'journey' && <StartScreen onStart={onStart} />}
-      {tab === 'album' && <AlbumScreen onStart={onStart} />}
-      {tab === 'journal' && <JournalScreen />}
-      {tab === 'library' && <LibraryScreen />}
-      <nav className="fixed bottom-0 right-0 left-0 flex justify-around py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-[#0E0B18]/80 backdrop-blur-xl border-t border-ink/10 text-[13px]">
-        {([['journey', 'מסע'], ['album', 'האלבום'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`px-4 py-1 transition-opacity ${tab === k ? 'opacity-100' : 'opacity-55'}`}>{l}</button>
-        ))}
+    <div className="h-full overflow-y-auto relative" style={{ background: '#070510' }}>
+      <Cosmos ambient color="#7B2FD6" color2="#FF5FC8" intensity={0.4} phase={3} paused={false} />
+      <div className="relative z-10">
+        {tab === 'journey' && <StartScreen onStart={onStart} />}
+        {tab === 'album' && <AlbumScreen onStart={onStart} />}
+        {tab === 'journal' && <JournalScreen />}
+        {tab === 'library' && <LibraryScreen />}
+      </div>
+      <nav className="fixed z-20 bottom-0 right-0 left-0 flex justify-around items-end pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] text-[11px]" style={{ background: 'linear-gradient(180deg, rgba(14,11,24,0.0), rgba(14,11,24,0.85) 30%)', backdropFilter: 'blur(18px)', borderTop: '1px solid rgba(242,238,230,0.08)' }}>
+        {([['journey', 'מסע'], ['album', 'האלבום'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => {
+          const on = tab === k
+          return (
+            <button key={k} onClick={() => setTab(k)} className="flex flex-col items-center gap-1 px-3 py-1 transition-all duration-500" style={{ opacity: on ? 1 : 0.55 }}>
+              <span className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-500" style={{ background: on ? 'linear-gradient(135deg, #FF5FC8, #7B2FD6)' : 'rgba(255,255,255,0.05)', boxShadow: on ? '0 0 24px -4px #FF5FC8' : 'none' }}>
+                <NavIcon name={k} active={on} />
+              </span>
+              <span style={{ color: on ? '#FF9FE0' : undefined }}>{l}</span>
+            </button>
+          )
+        })}
       </nav>
     </div>
   )

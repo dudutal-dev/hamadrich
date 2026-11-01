@@ -17,7 +17,7 @@
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: var(--color-bg);
+  background: #070510;
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-weight: 300;
@@ -38,12 +38,12 @@ html, body, #root {
 .fade-in { animation: fadeIn 900ms var(--ease-soft) both; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.card { background: linear-gradient(160deg, rgba(123,47,214,0.14), rgba(25,184,166,0.08)); border: 1px solid rgba(242,238,230,0.12); backdrop-filter: blur(6px); }
+.card { background: linear-gradient(160deg, rgba(123,47,214,0.22), rgba(25,184,166,0.10)); border: 1px solid rgba(242,238,230,0.16); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 40px -20px rgba(123,47,214,0.8); }
 .card-active { background: linear-gradient(160deg, rgba(123,47,214,0.42), rgba(255,95,200,0.22)); border-color: rgba(255,95,200,0.7); box-shadow: 0 0 0 1px rgba(255,95,200,0.25), 0 0 40px -8px rgba(255,95,200,0.55); }
 
 /* psychedelic background: drifting color blobs */
 .bg-psy { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #0E0B18; }
-.bg-psy::before, .bg-psy::after { content: ''; position: absolute; width: 90vmax; height: 90vmax; border-radius: 50%; filter: blur(70px); opacity: 0.55; mix-blend-mode: screen; }
+.bg-psy::before, .bg-psy::after { content: ''; position: absolute; width: 90vmax; height: 90vmax; border-radius: 50%; opacity: 0.5; }
 .bg-psy::before { background: radial-gradient(circle, #7B2FD6 0%, #2F5FE0 45%, transparent 70%); top: -35vmax; right: -25vmax; animation: drift1 28s ease-in-out infinite alternate; }
 .bg-psy::after { background: radial-gradient(circle, #19B8A6 0%, #FF5FC8 50%, transparent 70%); bottom: -40vmax; left: -30vmax; animation: drift2 34s ease-in-out infinite alternate; }
 @keyframes drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(-18vmax, 22vmax) scale(1.15); } }
@@ -51,7 +51,7 @@ html, body, #root {
 
 /* journey aurora driven by phase colors */
 .aurora { position: absolute; inset: 0; pointer-events: none; }
-.aurora::before, .aurora::after { content: ''; position: absolute; width: 110vmax; height: 110vmax; border-radius: 50%; filter: blur(80px); mix-blend-mode: screen; opacity: 0.5; transition: background 3000ms; }
+.aurora::before, .aurora::after { content: ''; position: absolute; width: 110vmax; height: 110vmax; border-radius: 50%; opacity: 0.5; transition: background 3000ms; }
 .aurora::before { background: radial-gradient(circle, var(--c1) 0%, transparent 60%); top: -50vmax; left: -30vmax; animation: drift1 40s ease-in-out infinite alternate; }
 .aurora::after { background: radial-gradient(circle, var(--c2) 0%, transparent 60%); bottom: -55vmax; right: -35vmax; animation: drift2 46s ease-in-out infinite alternate; opacity: 0.35; }
 

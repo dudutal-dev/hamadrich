@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Cosmos } from './Cosmos'
 import { type Asset, type JournalEntry, db, uid } from '../db'
 import { measureDuration, startRecording } from '../engine/library'
 
@@ -47,7 +48,7 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
   }
 
   return (
-    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto relative"><div className="bg-psy" />
+    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto relative" style={{ background: "#070510" }}><Cosmos color="#7B2FD6" color2="#FF5FC8" intensity={0.5} phase={3} paused={false} />
       <div className="text-[13px] opacity-70 tracking-widest">אינטגרציה</div>
       <h2 className="text-[28px] font-normal leading-relaxed title-psy">{q}</h2>
 

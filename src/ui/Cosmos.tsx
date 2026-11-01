@@ -6,13 +6,15 @@ interface Props {
   intensity: number // 0..1 (breath / peak)
   phase: number
   paused: boolean
+  /** ambient = background for menu screens: core at top, softer */
+  ambient?: boolean
 }
 
 /** Full-screen canvas: star field + drifting nebula clouds + rotating light rays, tinted by phase colors */
-export function Cosmos({ color, color2, intensity, phase, paused }: Props) {
+export function Cosmos({ color, color2, intensity, phase, paused, ambient = false }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const state = useRef({ color, color2, intensity, phase, paused })
-  state.current = { color, color2, intensity, phase, paused }
+  const state = useRef({ color, color2, intensity, phase, paused, ambient })
+  state.current = { color, color2, intensity, phase, paused, ambient }
 
   useEffect(() => {
     const cv = ref.current!
@@ -32,13 +34,14 @@ export function Cosmos({ color, color2, intensity, phase, paused }: Props) {
     const draw = (now: number) => {
       const s = state.current
       const dt = s.paused ? 0 : (now - t0) / 1000; t0 = now; t += dt
-      const cx = w / 2, cy = h * 0.40
+      const cx = w / 2, cy = s.ambient ? h * 0.18 : h * 0.40
+      const amb = s.ambient ? 0.85 : 1
       const peak = s.phase === 3
       ctx.clearRect(0, 0, w, h)
 
       // deep space base
       const g0 = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h))
-      g0.addColorStop(0, hex(s.color, 0.28)); g0.addColorStop(0.5, 'rgba(14,11,24,0.6)'); g0.addColorStop(1, '#070510')
+      g0.addColorStop(0, hex(s.color, s.ambient ? 0.45 : 0.28)); g0.addColorStop(0.5, s.ambient ? hex(s.color, 0.12) : 'rgba(14,11,24,0.6)'); g0.addColorStop(1, '#070510')
       ctx.fillStyle = g0; ctx.fillRect(0, 0, w, h)
 
       // nebula clouds
@@ -49,7 +52,7 @@ export function Cosmos({ color, color2, intensity, phase, paused }: Props) {
         const r = c.r * Math.max(w, h) * 0.55
         const g = ctx.createRadialGradient(x, y, 0, x, y, r)
         const col = c.k ? s.color2 : s.color
-        g.addColorStop(0, hex(col, 0.16 + s.intensity * 0.06)); g.addColorStop(0.6, hex(col, 0.05)); g.addColorStop(1, hex(col, 0))
+        g.addColorStop(0, hex(col, (0.16 + s.intensity * 0.06) * amb)); g.addColorStop(0.6, hex(col, 0.05 * amb)); g.addColorStop(1, hex(col, 0))
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
       }
 
@@ -59,7 +62,7 @@ export function Cosmos({ color, color2, intensity, phase, paused }: Props) {
       for (let i = 0; i < rays; i++) {
         const a = rot + (i / rays) * Math.PI * 2
         const wob = 0.6 + 0.4 * Math.sin(t * 0.7 + i * 1.7)
-        const alpha = (peak ? 0.10 : 0.07) * wob + s.intensity * 0.05
+        const alpha = ((peak ? 0.10 : 0.07) * wob + s.intensity * 0.05) * amb
         const g = ctx.createLinearGradient(cx, cy, cx + Math.cos(a) * rayLen, cy + Math.sin(a) * rayLen)
         g.addColorStop(0, hex(i % 2 ? s.color2 : '#FFFFFF', alpha)); g.addColorStop(0.5, hex(s.color2, alpha * 0.45)); g.addColorStop(1, hex(s.color, 0))
         ctx.fillStyle = g
@@ -73,13 +76,13 @@ export function Cosmos({ color, color2, intensity, phase, paused }: Props) {
       // core glow (white heart)
       const coreR = Math.min(w, h) * (0.22 + s.intensity * 0.08)
       const gc = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR)
-      gc.addColorStop(0, `rgba(255,255,255,${0.35 + s.intensity * 0.3})`); gc.addColorStop(0.35, hex(s.color2, 0.35)); gc.addColorStop(1, hex(s.color, 0))
+      gc.addColorStop(0, `rgba(255,255,255,${(0.35 + s.intensity * 0.3) * amb})`); gc.addColorStop(0.35, hex(s.color2, 0.35)); gc.addColorStop(1, hex(s.color, 0))
       ctx.fillStyle = gc; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill()
 
       // stars
       for (const st of stars) {
         const tw = 0.5 + 0.5 * Math.sin(t * st.sp + st.tw)
-        ctx.fillStyle = `rgba(255,255,255,${0.25 + tw * 0.6})`
+        ctx.fillStyle = `rgba(255,255,255,${(0.25 + tw * 0.6) * (s.ambient ? 0.8 : 1)})`
         ctx.beginPath(); ctx.arc(st.x * w, st.y * h, st.r * (0.8 + tw * 0.5), 0, Math.PI * 2); ctx.fill()
       }
       // sparkle dust drifting up
@@ -96,5 +99,5 @@ export function Cosmos({ color, color2, intensity, phase, paused }: Props) {
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [])
 
-  return <canvas ref={ref} className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }} />
+  return <canvas ref={ref} className={`${ambient ? 'fixed' : 'absolute'} inset-0 w-full h-full`} style={{ pointerEvents: 'none', zIndex: ambient ? 0 : undefined }} />
 }
