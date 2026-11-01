@@ -125,7 +125,7 @@ export const DEFAULT_SETTINGS: Settings = {
   id: 'main',
   musicGain: 0.8,
   voiceGain: 1,
-  breathGain: 0.6,
+  breathGain: 0.8,
   haptics: true,
   output: 'speakers',
   binaural: true,

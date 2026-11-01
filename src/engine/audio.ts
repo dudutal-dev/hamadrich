@@ -371,17 +371,61 @@ export class SessionEngine {
     this.state.breath = step; this.state.breathProgress = prog
   }
 
+  private noiseBuf: AudioBuffer | null = null
+  private getNoise(): AudioBuffer {
+    if (this.noiseBuf) return this.noiseBuf
+    const ctx = this.ctx!
+    const len = ctx.sampleRate * 12
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    // pink-ish noise: smoother than white, closer to breath
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852
+      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926
+    }
+    this.noiseBuf = buf
+    return buf
+  }
+
+  /** Realistic breath sound: filtered pink noise shaped like a human inhale (rising, opening) or exhale (falling, closing) */
   private breathTone(step: BreathStep, dur: number) {
     if (!this.ctx || !dur) return
-    const o = this.ctx.createOscillator(); o.type = 'sine'
-    const g = this.ctx.createGain(); g.gain.value = 0
-    o.connect(g); g.connect(this.breathBus)
-    const now = this.ctx.currentTime
-    if (step === 'inhale') { o.frequency.setValueAtTime(392, now); o.frequency.linearRampToValueAtTime(587, now + dur) }
-    else { o.frequency.setValueAtTime(587, now); o.frequency.linearRampToValueAtTime(349, now + dur) }
-    g.gain.linearRampToValueAtTime(0.35, now + dur * 0.4)
-    g.gain.linearRampToValueAtTime(0, now + dur)
-    o.start(now); o.stop(now + dur + 0.1)
+    const ctx = this.ctx, now = ctx.currentTime
+    const src = ctx.createBufferSource(); src.buffer = this.getNoise(); src.loop = true
+    src.playbackRate.value = 0.9 + Math.random() * 0.2
+    // body: bandpass that sweeps – inhale brightens, exhale darkens
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.9
+    // air: high shelf for the "hiss" of air through the nose/lips
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 180
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'
+    const g = ctx.createGain(); g.gain.value = 0
+    src.connect(hp); hp.connect(bp); bp.connect(lp); lp.connect(g); g.connect(this.breathBus)
+    const peak = step === 'inhale' ? 0.9 : 0.75
+    if (step === 'inhale') {
+      bp.frequency.setValueAtTime(500, now); bp.frequency.exponentialRampToValueAtTime(1900, now + dur * 0.85)
+      lp.frequency.setValueAtTime(1800, now); lp.frequency.exponentialRampToValueAtTime(5200, now + dur * 0.8)
+      // inhale: swells, peaks near the end, short release
+      g.gain.setValueAtTime(0.0001, now)
+      g.gain.exponentialRampToValueAtTime(peak * 0.45, now + dur * 0.3)
+      g.gain.exponentialRampToValueAtTime(peak, now + dur * 0.78)
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+    } else {
+      bp.frequency.setValueAtTime(1500, now); bp.frequency.exponentialRampToValueAtTime(380, now + dur)
+      lp.frequency.setValueAtTime(4200, now); lp.frequency.exponentialRampToValueAtTime(1100, now + dur)
+      // exhale: quick onset, long gentle decay
+      g.gain.setValueAtTime(0.0001, now)
+      g.gain.exponentialRampToValueAtTime(peak, now + Math.min(0.5, dur * 0.18))
+      g.gain.exponentialRampToValueAtTime(peak * 0.5, now + dur * 0.6)
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+    }
+    // slight tremor like a real breath
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 5.5 + Math.random() * 2
+    const lg = ctx.createGain(); lg.gain.value = 0.08
+    lfo.connect(lg); lg.connect(g.gain); lfo.start(now); lfo.stop(now + dur + 0.1)
+    src.start(now); src.stop(now + dur + 0.1)
   }
 
   pause() {
