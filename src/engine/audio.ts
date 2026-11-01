@@ -147,12 +147,14 @@ class Drone {
  *  Volume/fades are then done on the element itself. */
 class Track {
   private el: HTMLAudioElement
+  private shadow: HTMLAudioElement | null = null
+  private shadowSrc: MediaElementAudioSourceNode | null = null
   private src: MediaElementAudioSourceNode | null = null
   private gain: GainNode | null = null
   private url: string
   private target: number
   private fadeTimer = 0
-  constructor(private ctx: AudioContext, out: AudioNode, blob: Blob, loop: boolean, gainDb: number, fadeIn: number, private direct = false, private busGain = 1) {
+  constructor(private ctx: AudioContext, out: AudioNode, blob: Blob, loop: boolean, gainDb: number, fadeIn: number, private direct = false, private busGain = 1, analyser: AnalyserNode | null = null) {
     this.url = URL.createObjectURL(blob)
     this.el = new Audio()
     this.el.src = this.url
@@ -163,11 +165,22 @@ class Track {
       this.el.volume = 0
       void this.el.play().catch((e) => console.warn('track play failed', e))
       this.fadeTo(this.target * this.busGain, fadeIn)
+      // visual tap: a second element, silent, feeding the analyser (only works while the page is visible)
+      if (analyser) {
+        try {
+          this.shadow = new Audio(); this.shadow.src = this.url; this.shadow.loop = loop; this.shadow.preload = 'auto'; this.shadow.crossOrigin = 'anonymous'
+          this.shadowSrc = ctx.createMediaElementSource(this.shadow)
+          const mute = ctx.createGain(); mute.gain.value = 0
+          this.shadowSrc.connect(analyser); analyser.connect(mute); mute.connect(ctx.destination)
+          void this.shadow.play().catch(() => {})
+        } catch { this.shadow = null }
+      }
     } else {
       this.el.crossOrigin = 'anonymous'
       this.gain = ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(out)
       this.src = ctx.createMediaElementSource(this.el)
       this.src.connect(this.gain)
+      if (analyser) this.src.connect(analyser)
       void this.el.play().catch((e) => console.warn('track play failed', e))
       this.gain.gain.linearRampToValueAtTime(this.target, ctx.currentTime + fadeIn)
     }
@@ -180,8 +193,10 @@ class Track {
   }
   setBus(v: number) { this.busGain = v; if (this.direct) this.fadeTo(this.target * v, 0.3) }
   duck(factor: number, sec: number) { if (this.direct) this.fadeTo(this.target * this.busGain * factor, sec) }
-  pause() { this.el.pause() }
-  resume() { void this.el.play().catch(() => {}) }
+  pause() { this.el.pause(); this.shadow?.pause() }
+  resume() { void this.el.play().catch(() => {}); if (this.shadow) { this.shadow.currentTime = this.el.currentTime; void this.shadow.play().catch(() => {}) } }
+  /** keep the silent visual copy aligned with the audible one */
+  syncShadow() { if (!this.shadow) return; if (Math.abs(this.shadow.currentTime - this.el.currentTime) > 0.35) this.shadow.currentTime = this.el.currentTime; if (this.shadow.paused && !this.el.paused) void this.shadow.play().catch(() => {}) }
   /** iOS may have paused the element while backgrounded; if we are supposed to be playing, play again */
   kick() { if (this.el.paused && !this.el.ended && this.el.src) void this.el.play().catch(() => {}) }
   get ended() { return this.el.ended }
@@ -190,7 +205,7 @@ class Track {
       const t = this.ctx.currentTime
       this.gain.gain.cancelScheduledValues(t); this.gain.gain.setValueAtTime(this.gain.gain.value, t); this.gain.gain.linearRampToValueAtTime(0, t + fade)
     }
-    setTimeout(() => { this.el.pause(); this.el.src = ''; this.src?.disconnect(); this.gain?.disconnect(); URL.revokeObjectURL(this.url) }, fade * 1000 + 100)
+    setTimeout(() => { this.el.pause(); this.el.src = ''; this.src?.disconnect(); this.gain?.disconnect(); if (this.shadow) { this.shadow.pause(); this.shadow.src = ''; this.shadowSrc?.disconnect() } URL.revokeObjectURL(this.url) }, fade * 1000 + 100)
   }
 }
 
@@ -200,6 +215,8 @@ export class SessionEngine {
   private musicBus!: GainNode
   private voiceBus!: GainNode
   private breathBus!: GainNode
+  analyser: AnalyserNode | null = null
+  private freq = new Uint8Array(0)
   private current: Drone | Track | null = null
   private cueIdx = 0
   private startCtxTime = 0
@@ -224,6 +241,16 @@ export class SessionEngine {
     this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: plan.cues.filter((c) => c.layer === 'music' && c.asset).length, musicGain: 0.8 }
   }
 
+  /** audio-reactive levels for visuals: { bass, mid, high, energy } 0..1 */
+  levels(): { bass: number; mid: number; high: number; energy: number } {
+    if (!this.analyser) return { bass: 0, mid: 0, high: 0, energy: 0 }
+    this.analyser.getByteFrequencyData(this.freq)
+    const n = this.freq.length // 256 bins @ ~86 Hz each at 44.1k
+    const avg = (a: number, b: number) => { let s = 0; for (let i = a; i < b; i++) s += this.freq[i]; return s / ((b - a) * 255) }
+    const bass = avg(1, 6), mid = avg(6, 40), high = avg(40, Math.min(n, 120))
+    return { bass, mid, high, energy: bass * 0.5 + mid * 0.35 + high * 0.15 }
+  }
+
   on(l: Listener) { this.listeners.add(l); return () => this.listeners.delete(l) }
   private emit() { this.listeners.forEach((l) => l({ ...this.state })) }
 
@@ -240,6 +267,10 @@ export class SessionEngine {
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.gains.music; this.musicBus.connect(this.master)
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.gains.voice; this.voiceBus.connect(this.master)
     this.breathBus = ctx.createGain(); this.breathBus.gain.value = this.gains.breath; this.breathBus.connect(this.master)
+    this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 512; this.analyser.smoothingTimeConstant = 0.82
+    this.freq = new Uint8Array(this.analyser.frequencyBinCount)
+    // drone/voice/breath also feed the analyser (via the music bus tap)
+    this.musicBus.connect(this.analyser)
     // preload: voice cues are decoded (short); music stays as blobs and streams
     const voiceIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'voice' && c.asset).map((c) => c.asset as string))]
     const musicIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'music' && c.asset).map((c) => c.asset as string))]
@@ -281,7 +312,7 @@ export class SessionEngine {
     this.tick()
     this.keepAlive()
     // rAF stops in background; a coarse interval keeps cues firing (track changes) while the screen is off
-    this.ivl = window.setInterval(() => { if (!this.state.running || this.state.paused) return; if (this.current instanceof Track) this.current.kick(); if (document.hidden) this.tick() }, 1000)
+    this.ivl = window.setInterval(() => { if (!this.state.running || this.state.paused) return; if (this.current instanceof Track) { this.current.kick(); this.current.syncShadow() } if (document.hidden) this.tick() }, 1000)
   }
 
   /** silent looping buffer keeps iOS audio session alive in background */
@@ -325,7 +356,7 @@ export class SessionEngine {
       const prev = this.current
       if (c.asset && this.blobs.has(c.asset)) {
         const isAlbum = this.plan.mode === 'album'
-        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music)
+        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music, this.analyser)
         prev?.stop(isAlbum ? 1.5 : XFADE)
         this.state.trackName = this.names.get(c.asset) ?? ''
         this.state.trackNo = this.plan.cues.filter((x) => x.layer === 'music' && x.asset).indexOf(c) + 1

@@ -82,9 +82,10 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
       <header className="relative overflow-hidden rounded-3xl p-6" style={{ background: 'linear-gradient(135deg, #E8842E55, #FF5FC844 50%, #7B2FD655)', border: '1px solid #FF5FC866', boxShadow: '0 0 60px -15px #FF5FC8' }}>
         <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full" style={{ background: 'radial-gradient(circle, #FFD08A88, transparent 70%)', filter: 'blur(24px)' }} />
         <div className="relative">
-          <div className="text-[12px] tracking-[0.3em] opacity-80">פרק מיוחד</div>
+          <div className="text-[12px] tracking-[0.3em] opacity-80">פרק מיוחד · מסע מודרך בקול</div>
           <h1 className="text-[32px] font-normal leading-tight mt-1">{album.name}</h1>
           <p className="text-[14px] opacity-85 mt-2 leading-relaxed">Blakely Saucier · Desert Dwellers · Liquid Bloom<br />{album.trackCount} רצועות · {Math.round(album.totalSec / 60)} דקות · 5 פרקים</p>
+          <p className="text-[13px] opacity-80 mt-3 leading-relaxed"><span className="opacity-70">סוג המסע: </span>מודרך – המדריך הוא האלבום. האפליקציה לא מדברת ולא מנגנת דרון; היא מזהה פרק, מוסיפה נשימה בשקטים, מציירת לפי המוזיקה, ושומרת ביומן.</p>
           <button onClick={() => setIntro(true)} className="mt-4 rounded-full px-4 py-2 text-[14px]" style={{ background: 'rgba(14,11,24,0.45)', border: '1px solid rgba(242,238,230,0.35)' }}>✦ מה המסע הזה ומה המשמעות</button>
         </div>
       </header>

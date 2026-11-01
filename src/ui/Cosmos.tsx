@@ -3,94 +3,141 @@ import { useEffect, useRef } from 'react'
 interface Props {
   color: string
   color2: string
-  intensity: number // 0..1 (breath / peak)
+  intensity: number // breath 0..1
   phase: number
   paused: boolean
-  /** ambient = background for menu screens: core at top, softer */
   ambient?: boolean
+  /** live audio levels; when provided the visual moves with the music */
+  levels?: () => { bass: number; mid: number; high: number; energy: number }
 }
 
-/** Full-screen canvas: star field + drifting nebula clouds + rotating light rays, tinted by phase colors */
-export function Cosmos({ color, color2, intensity, phase, paused, ambient = false }: Props) {
+const hexToRgb = (c: string) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255] as const }
+const rgba = (c: string, a: number) => { const [r, g, b] = hexToRgb(c); return `rgba(${r},${g},${b},${a})` }
+const mix = (a: string, b: string, t: number) => { const A = hexToRgb(a), B = hexToRgb(b); return `#${[0, 1, 2].map((i) => Math.round(A[i] + (B[i] - A[i]) * t).toString(16).padStart(2, '0')).join('')}` }
+
+/** Nebula palette like the reference: salmon/peach clouds, magenta, cyan streaks, hot white core — tinted toward the phase colors */
+const NEB = { peach: '#FFB08A', rose: '#FF7AB6', magenta: '#E25CFF', cyan: '#5FE3FF', violet: '#7B5CFF', gold: '#FFD48A' }
+
+export function Cosmos({ color, color2, intensity, phase, paused, ambient = false, levels }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const state = useRef({ color, color2, intensity, phase, paused, ambient })
-  state.current = { color, color2, intensity, phase, paused, ambient }
+  const st = useRef({ color, color2, intensity, phase, paused, ambient, levels })
+  st.current = { color, color2, intensity, phase, paused, ambient, levels }
 
   useEffect(() => {
     const cv = ref.current!
-    const ctx = cv.getContext('2d')!
-    let w = 0, h = 0, dpr = Math.min(2, window.devicePixelRatio || 1)
+    const ctx = cv.getContext('2d', { alpha: false })!
+    let w = 0, h = 0
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
     const resize = () => { w = cv.clientWidth; h = cv.clientHeight; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0) }
     resize(); window.addEventListener('resize', resize)
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    const stars = Array.from({ length: 160 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + 0.3, tw: Math.random() * Math.PI * 2, sp: 0.3 + Math.random() * 0.9 }))
-    const clouds = Array.from({ length: 7 }, (_, i) => ({ x: Math.random(), y: 0.35 + Math.random() * 0.5, r: 0.35 + Math.random() * 0.35, a: Math.random() * Math.PI * 2, sp: 0.02 + Math.random() * 0.03, k: i % 2 }))
-    const rays = 18
-    let t0 = performance.now(), t = 0, raf = 0
+    // offscreen nebula sprite (soft blob) for cheap blurred clouds on iOS
+    const sprite = document.createElement('canvas'); sprite.width = sprite.height = 256
+    const sc = sprite.getContext('2d')!
+    const sg = sc.createRadialGradient(128, 128, 0, 128, 128, 128)
+    sg.addColorStop(0, 'rgba(255,255,255,1)'); sg.addColorStop(0.35, 'rgba(255,255,255,0.55)'); sg.addColorStop(0.7, 'rgba(255,255,255,0.12)'); sg.addColorStop(1, 'rgba(255,255,255,0)')
+    sc.fillStyle = sg; sc.fillRect(0, 0, 256, 256)
 
-    const hex = (c: string, a: number) => { const n = parseInt(c.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})` }
+    const stars = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.3 + 0.3, tw: Math.random() * Math.PI * 2, sp: 0.4 + Math.random() * 1.2, c: Math.random() }))
+    // cloud bank: lower half is denser (like the reference), colors cycle through the nebula palette
+    const palette = [NEB.peach, NEB.rose, NEB.magenta, NEB.cyan, NEB.violet, NEB.peach, NEB.gold]
+    const clouds = Array.from({ length: 26 }, (_, i) => ({
+      x: Math.random(), y: 0.25 + Math.random() * 0.75, r: 0.18 + Math.random() * 0.3,
+      a: Math.random() * Math.PI * 2, sp: 0.015 + Math.random() * 0.03, c: palette[i % palette.length], k: Math.random(),
+    }))
+    const RAYS = 28
+    const rayPhase = Array.from({ length: RAYS }, () => Math.random() * Math.PI * 2)
+    const dust = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: 0.4 + Math.random() * 1.2, p: Math.random() * Math.PI * 2 }))
+
+    let t0 = performance.now(), t = 0, raf = 0
+    // smoothed audio
+    let bass = 0, mid = 0, high = 0, energy = 0, beat = 0, lastBass = 0
+    const lerp = (a: number, b: number, k: number) => a + (b - a) * k
 
     const draw = (now: number) => {
-      const s = state.current
-      const dt = s.paused ? 0 : (now - t0) / 1000; t0 = now; t += dt
-      const cx = w / 2, cy = s.ambient ? h * 0.18 : h * 0.40
-      const amb = s.ambient ? 0.85 : 1
-      const peak = s.phase === 3
-      ctx.clearRect(0, 0, w, h)
+      const s = st.current
+      const dt = s.paused ? 0 : Math.min(0.05, (now - t0) / 1000); t0 = now; t += dt
+      const lv = s.levels?.() ?? { bass: 0, mid: 0, high: 0, energy: 0 }
+      bass = lerp(bass, lv.bass, 0.25); mid = lerp(mid, lv.mid, 0.2); high = lerp(high, lv.high, 0.3); energy = lerp(energy, lv.energy, 0.15)
+      // onset detector → beat pulse
+      if (lv.bass - lastBass > 0.08) beat = 1
+      lastBass = lv.bass
+      beat *= 0.9
+      const drive = s.ambient ? 0.5 : 1
+      const pulse = Math.min(1, s.intensity * 0.35 + bass * 0.45 + beat * 0.35)
 
-      // deep space base
-      const g0 = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h))
-      g0.addColorStop(0, hex(s.color, s.ambient ? 0.45 : 0.28)); g0.addColorStop(0.5, s.ambient ? hex(s.color, 0.12) : 'rgba(14,11,24,0.6)'); g0.addColorStop(1, '#070510')
+      const cx = w / 2, cy = s.ambient ? h * 0.2 : h * 0.31
+      const peak = s.phase === 3
+      const c1 = s.color, c2 = s.color2
+
+      // --- deep space ---
+      const g0 = ctx.createLinearGradient(0, 0, 0, h)
+      g0.addColorStop(0, '#04020A'); g0.addColorStop(0.5, mix('#090614', c1, 0.14)); g0.addColorStop(1, mix('#0E081C', c1, 0.2))
+      ctx.globalCompositeOperation = 'source-over'
       ctx.fillStyle = g0; ctx.fillRect(0, 0, w, h)
 
-      // nebula clouds
-      ctx.globalCompositeOperation = 'screen'
-      for (const c of clouds) {
-        const x = (c.x + Math.sin(t * c.sp + c.a) * 0.08) * w
-        const y = (c.y + Math.cos(t * c.sp * 0.8 + c.a) * 0.05) * h
-        const r = c.r * Math.max(w, h) * 0.55
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-        const col = c.k ? s.color2 : s.color
-        g.addColorStop(0, hex(col, (0.16 + s.intensity * 0.06) * amb)); g.addColorStop(0.6, hex(col, 0.05 * amb)); g.addColorStop(1, hex(col, 0))
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+      // --- stars (far, twinkle with highs) ---
+      for (const sx of stars) {
+        const tw = 0.5 + 0.5 * Math.sin(t * sx.sp + sx.tw)
+        const a = (0.25 + tw * 0.55) * (0.7 + high * 0.8)
+        ctx.fillStyle = sx.c < 0.15 ? rgba(NEB.cyan, a) : sx.c < 0.3 ? rgba(NEB.peach, a) : `rgba(255,255,255,${a})`
+        ctx.beginPath(); ctx.arc(sx.x * w, sx.y * h, sx.r * (0.8 + tw * 0.5 + high * 0.6), 0, Math.PI * 2); ctx.fill()
       }
 
-      // light rays from the center
-      const rot = reduced ? 0 : t * 0.04
-      const rayLen = Math.max(w, h) * (0.55 + s.intensity * 0.25)
-      for (let i = 0; i < rays; i++) {
-        const a = rot + (i / rays) * Math.PI * 2
-        const wob = 0.6 + 0.4 * Math.sin(t * 0.7 + i * 1.7)
-        const alpha = ((peak ? 0.10 : 0.07) * wob + s.intensity * 0.05) * amb
-        const g = ctx.createLinearGradient(cx, cy, cx + Math.cos(a) * rayLen, cy + Math.sin(a) * rayLen)
-        g.addColorStop(0, hex(i % 2 ? s.color2 : '#FFFFFF', alpha)); g.addColorStop(0.5, hex(s.color2, alpha * 0.45)); g.addColorStop(1, hex(s.color, 0))
+      // --- nebula clouds (additive sprites) ---
+      ctx.globalCompositeOperation = 'lighter'
+      const big = Math.max(w, h)
+      for (const c of clouds) {
+        const x = (c.x + Math.sin(t * c.sp + c.a) * 0.06) * w
+        const y = (c.y + Math.cos(t * c.sp * 0.7 + c.a) * 0.04) * h
+        const r = c.r * big * 0.8 * (1 + mid * 0.15 + s.intensity * 0.08)
+        // tint: 60% nebula palette, 40% phase color
+        const col = mix(c.c, c.k < 0.5 ? c1 : c2, 0.4)
+        ctx.globalAlpha = Math.min(0.16, (0.05 + mid * 0.07 + energy * 0.04)) * drive * (peak ? 0.8 : 1)
+        ctx.filter = 'none'
+        // colorize the white sprite via composite trick: draw tinted rect through sprite mask
+        ctx.save(); ctx.translate(x - r, y - r); ctx.scale(r * 2 / 256, r * 2 / 256)
+        ctx.drawImage(tinted(sprite, col), 0, 0); ctx.restore()
+      }
+      ctx.globalAlpha = 1
+
+      // --- prismatic rays (chromatic: cyan edge / white core / rose edge) ---
+      const rot = reduced ? 0 : t * 0.025
+      const rayLen = big * (0.7 + pulse * 0.25)
+      for (let i = 0; i < RAYS; i++) {
+        const a = rot + (i / RAYS) * Math.PI * 2
+        const wob = 0.55 + 0.45 * Math.sin(t * 0.9 + rayPhase[i] + mid * 4)
+        const base = (peak ? 0.085 : 0.06) * wob + pulse * 0.045
+        const spread = 0.012 + 0.012 * wob + bass * 0.01
+        const edge = i % 3 === 0 ? NEB.cyan : i % 3 === 1 ? NEB.rose : NEB.gold
+        const ex = Math.cos(a) * rayLen, ey = Math.sin(a) * rayLen
+        const g = ctx.createLinearGradient(cx, cy, cx + ex, cy + ey)
+        g.addColorStop(0, `rgba(255,255,255,${base * 1.2})`); g.addColorStop(0.2, rgba(edge, base * 0.8)); g.addColorStop(0.55, rgba(c2, base * 0.3)); g.addColorStop(1, rgba(c1, 0))
         ctx.fillStyle = g
         ctx.beginPath(); ctx.moveTo(cx, cy)
-        const spread = 0.018 + 0.01 * wob
         ctx.lineTo(cx + Math.cos(a - spread) * rayLen, cy + Math.sin(a - spread) * rayLen)
         ctx.lineTo(cx + Math.cos(a + spread) * rayLen, cy + Math.sin(a + spread) * rayLen)
         ctx.closePath(); ctx.fill()
       }
 
-      // core glow (white heart)
-      const coreR = Math.min(w, h) * (0.22 + s.intensity * 0.08)
+      // --- hot core (white → peach → phase) ---
+      const coreR = Math.min(w, h) * (0.17 + pulse * 0.07) * drive
       const gc = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR)
-      gc.addColorStop(0, `rgba(255,255,255,${(0.35 + s.intensity * 0.3) * amb})`); gc.addColorStop(0.35, hex(s.color2, 0.35)); gc.addColorStop(1, hex(s.color, 0))
+      gc.addColorStop(0, `rgba(255,255,255,${0.55 * drive})`); gc.addColorStop(0.2, rgba(NEB.peach, 0.4 * drive)); gc.addColorStop(0.5, rgba(c2, 0.2)); gc.addColorStop(1, rgba(c1, 0))
       ctx.fillStyle = gc; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill()
+      // lens flare streak (horizontal)
+      const fl = ctx.createLinearGradient(cx - coreR * 2.2, cy, cx + coreR * 2.2, cy)
+      fl.addColorStop(0, 'rgba(255,255,255,0)'); fl.addColorStop(0.5, `rgba(255,255,255,${0.18 * drive + beat * 0.25})`); fl.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = fl; ctx.fillRect(cx - coreR * 2.2, cy - 1.2, coreR * 4.4, 2.4)
 
-      // stars
-      for (const st of stars) {
-        const tw = 0.5 + 0.5 * Math.sin(t * st.sp + st.tw)
-        ctx.fillStyle = `rgba(255,255,255,${(0.25 + tw * 0.6) * (s.ambient ? 0.8 : 1)})`
-        ctx.beginPath(); ctx.arc(st.x * w, st.y * h, st.r * (0.8 + tw * 0.5), 0, Math.PI * 2); ctx.fill()
-      }
-      // sparkle dust drifting up
-      for (let i = 0; i < 24; i++) {
-        const y = ((i / 24) + (t * 0.012 * (1 + (i % 3)))) % 1
-        const x = (Math.sin(i * 12.9898) * 0.5 + 0.5 + Math.sin(t * 0.3 + i) * 0.02) % 1
-        ctx.fillStyle = hex(i % 2 ? s.color2 : '#FFD08A', 0.25 + 0.3 * Math.sin(t + i))
-        ctx.beginPath(); ctx.arc(x * w, (1 - y) * h, 1.2, 0, Math.PI * 2); ctx.fill()
+      // --- rising dust sparks (react to highs) ---
+      for (const d of dust) {
+        const y = (d.y + (t * 0.02 * d.s)) % 1
+        const x = (d.x + Math.sin(t * 0.4 + d.p) * 0.015 + 1) % 1
+        const a = (0.15 + 0.35 * Math.abs(Math.sin(t * 2 + d.p))) * (0.6 + high * 1.2)
+        ctx.fillStyle = d.p % 2 < 1 ? rgba(NEB.gold, a) : rgba(NEB.cyan, a)
+        ctx.beginPath(); ctx.arc(x * w, (1 - y) * h, 0.8 + d.s * (0.6 + high), 0, Math.PI * 2); ctx.fill()
       }
       ctx.globalCompositeOperation = 'source-over'
       raf = requestAnimationFrame(draw)
@@ -100,4 +147,18 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
   }, [])
 
   return <canvas ref={ref} className={`${ambient ? 'fixed' : 'absolute'} inset-0 w-full h-full`} style={{ pointerEvents: 'none', zIndex: ambient ? 0 : undefined }} />
+}
+
+/** cache of tinted sprite copies (one per color) */
+const tintCache = new Map<string, HTMLCanvasElement>()
+function tinted(sprite: HTMLCanvasElement, color: string): HTMLCanvasElement {
+  let c = tintCache.get(color)
+  if (c) return c
+  c = document.createElement('canvas'); c.width = c.height = 256
+  const x = c.getContext('2d')!
+  x.drawImage(sprite, 0, 0)
+  x.globalCompositeOperation = 'source-in'
+  x.fillStyle = color; x.fillRect(0, 0, 256, 256)
+  tintCache.set(color, c)
+  return c
 }

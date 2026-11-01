@@ -87,7 +87,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   return (
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
       className="h-full relative flex flex-col items-center select-none touch-none overflow-hidden" style={{ background: '#070510' }}>
-      <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} />
+      <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} levels={() => engine.levels()} />
 
       {/* top bar */}
       <div className="relative w-full flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={ui}>
