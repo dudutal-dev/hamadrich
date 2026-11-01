@@ -38,8 +38,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2200) }
   const exit = () => { engine.stop(); onEnd(Math.round(s.t), false) }
 
+  const wasAsleep = useRef(false)
   const onDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button')) return
+    wasAsleep.current = !awake
     setAwake(true); pressStart.current = Date.now(); touchY.current = e.clientY
   }
   const onUp = (e: React.PointerEvent) => {
@@ -48,6 +50,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     const held = Date.now() - pressStart.current; pressStart.current = 0
     const dy = touchY.current - e.clientY
     if (emergency || confirmExit) return
+    if (wasAsleep.current && held < 700 && Math.abs(dy) < 90) { wasAsleep.current = false; return }
     if (dy > 90) { engine.skipToReturn(); flash('מדלג לחזרה'); return }
     if (held >= 3000) { setEmergency(true); engine.calm(); return }
     if (held >= 700) { engine.extend(600); flash('עוד עשר דקות'); return }
@@ -85,10 +88,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       <div className="aurora" style={{ ['--c1' as string]: color, ['--c2' as string]: color2, opacity: peak ? 0.55 : 0.9, transition: 'opacity 3000ms' }} />
 
       {/* top controls */}
-      <div className="absolute top-0 right-0 left-0 flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={{ opacity: awake ? 1 : 0, transition: 'opacity 1200ms', pointerEvents: awake ? 'auto' : 'none' }}>
-        <button onClick={() => setConfirmExit(true)} className="w-11 h-11 rounded-full border border-ink/25 bg-bg/40 backdrop-blur text-[18px] leading-none">✕</button>
+      <div className="absolute top-0 right-0 left-0 flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={{ opacity: awake ? 1 : 0.35, transition: 'opacity 1200ms' }}>
+        <button onClick={() => setConfirmExit(true)} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/50 backdrop-blur text-[20px] leading-none">✕</button>
         <div className="text-[13px] tracking-[0.3em]" style={{ color: color2 }}>{s.phaseName}</div>
-        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-11 h-11 rounded-full border border-ink/25 bg-bg/40 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
+        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/50 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
       </div>
 
       <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} />
