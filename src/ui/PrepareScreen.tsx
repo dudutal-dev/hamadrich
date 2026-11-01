@@ -2,13 +2,21 @@ import { useEffect, useState } from 'react'
 import { Cosmos } from './Cosmos'
 import type { Mode } from '../db'
 
+const ALBUM_LINES = [
+  'תפילות פסיכדליות. 55 שירים, מהכניסה ועד החזרה.',
+  'לירי כתב: שיר בזמן הנכון הוא דלת.',
+  'אל תנסה להבין את המילים. תן להן לעבור כמו מים.',
+  'בשיא – שקט מוחלט. זה מכוון.',
+  'לא נוהגים הערב. מים בהישג יד. אפשר לעצור בכל רגע.',
+  'מצא תנוחה נוחה. הטלפון יכול לנוח עכשיו.',
+]
 const LINES: Record<'short' | 'deep', string[]> = {
   short: ['מצא תנוחה נוחה.', 'הטלפון יכול לנוח עכשיו.', 'נגיעה אחת על המסך – עצירה. לחיצה ארוכה – עוד עשר דקות.'],
   deep: ['לא נוהגים הערב. מים בהישג יד.', 'אם אינך מרגיש יציב – אל תישאר לבד.', 'אפשר לעצור בכל רגע. לחיצה ארוכה של שלוש שניות מביאה עזרה.', 'מצא תנוחה נוחה. הטלפון יכול לנוח עכשיו.'],
 }
 
 export function PrepareScreen({ mode, onBegin, onCancel, loading }: { mode: Mode; onBegin: () => void; onCancel: () => void; loading: boolean }) {
-  const lines = mode === 'deep' || mode === 'album' ? LINES.deep : LINES.short
+  const lines = mode === 'album' ? ALBUM_LINES : mode === 'deep' ? LINES.deep : LINES.short
   const [i, setI] = useState(0)
   const [mood, setMood] = useState<number | null>(null)
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % lines.length), 6000); return () => clearInterval(id) }, [lines.length])

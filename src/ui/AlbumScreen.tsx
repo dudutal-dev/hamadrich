@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { type Album, type Asset, type Phase, db } from '../db'
 import { INTENTIONS, INTENTION_META, PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import type { StartChoice } from './StartScreen'
@@ -21,6 +22,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [openPhase, setOpenPhase] = useState<Phase | null>(null)
   const [editing, setEditing] = useState(false)
   const [preview, setPreview] = useState<{ id: string; el: HTMLAudioElement } | null>(null)
+  const [intro, setIntro] = useState(false)
 
   const load = async () => {
     const a = await db.albums.toCollection().first()
@@ -83,8 +85,10 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
           <div className="text-[12px] tracking-[0.3em] opacity-80">פרק מיוחד</div>
           <h1 className="text-[32px] font-normal leading-tight mt-1">{album.name}</h1>
           <p className="text-[14px] opacity-85 mt-2 leading-relaxed">Blakely Saucier · Desert Dwellers · Liquid Bloom<br />{album.trackCount} רצועות · {Math.round(album.totalSec / 60)} דקות · 5 פרקים</p>
+          <button onClick={() => setIntro(true)} className="mt-4 rounded-full px-4 py-2 text-[14px]" style={{ background: 'rgba(14,11,24,0.45)', border: '1px solid rgba(242,238,230,0.35)' }}>✦ מה המסע הזה ומה המשמעות</button>
         </div>
       </header>
+      {intro && createPortal(<IntroSheet onClose={() => setIntro(false)} />, document.body)}
 
       <section>
         <div className="text-[13px] opacity-60 tracking-widest mb-3">הכוונה</div>
@@ -145,6 +149,49 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
       </section>
 
       <p className="text-[12px] opacity-55 leading-relaxed px-1">במסע האלבום הקריינות העברית כבויה (יש כבר קול). +10 דקות מוסיף לופ בין רצועות, לא חותך. החלקה למעלה מדלגת לפרק החזרה.</p>
+    </div>
+  )
+}
+
+
+function IntroSheet({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={onClose}>
+      <div className="fade-in w-full max-h-[92vh] overflow-y-auto rounded-t-[32px] px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-5" style={{ background: 'linear-gradient(180deg, #E8842E33, #15112A 25%)', border: '1px solid rgba(242,238,230,0.12)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="w-10 h-1 rounded-full bg-ink/30 self-center" />
+        <h2 className="text-[28px] font-normal title-psy leading-tight">תפילות פסיכדליות – המסע</h2>
+
+        <Section title="מאיפה זה בא">
+          ב-1966, אחרי שכתב עם ריצ׳רד אלפרט ורלף מצנר מדריך למסע על בסיס הספר הטיבטי של המתים, טימותי לירי פנה מזרחה יותר – אל הטאו טה צ׳ינג. הוא לקח תשעה תרגומים אנגליים של לאו דזה ו"תרגם אותם לפסיכדלית": שירים קצרים, כל אחד מיועד להיקרא בנקודה מסוימת ברצף המסע. זה ספר השירה היחיד שלו, והוא ראה בטאו טקסט מתקדם יותר מהטיבטי – פחות על מוות ולידה מחדש, יותר על זרימה, רכות ואי-אחיזה.
+        </Section>
+        <Section title="מה שומעים">
+          בלייקלי סוסייה הקליטה את הקריאה שלה במהלך שני מסעות משלה – לכן הקול לא "מקריא" אלא נמצא בתוך מה שהוא מתאר. הקצב איטי, יש הרבה אוויר בין המשפטים. מתחת: אמביינט של Desert Dwellers ו-Liquid Bloom (אמאני פרנד), עם סנטור, צ׳לו, נגוני, חליל ודיג׳רידו – מוזיקה שנכתבה ממילא לסשנים של סאונד-הילינג. 55 רצועות, 93 דקות, בנויות כרצף אחד.
+        </Section>
+        <Section title="המשמעות של הסדר">
+          האלבום הוא מפה, לא פלייליסט. הוא מתחיל ב"המדריך" ו"מסר התנוחה" – הכנה והתמקמות; עובר דרך "כל הדברים חולפים" ו"הניחו לרשת הקורים" – שחרור של אחיזה; מגיע ל"מה שנקרא הטאו", "הסליל של ה-DNA", "חמשת החושים" – הליבה, שבה המילים מצביעות על מה שאי אפשר לומר; ואז הצ׳אקרות, "רגע המלאות", "השיעור של המים" – חזרה הדרגתית אל הגוף; ומסתיים ב"מי שמכיר את המרכז מחזיק מעמד" ו"לך בזהירות כשאתה בין…" – הוראות לחיים שאחרי. לירי כתב ששיר שנקרא בזמן הלא נכון הוא רעש; בזמן הנכון – דלת.
+        </Section>
+        <Section title="איך לעבור את זה">
+          <ul className="list-disc pr-5 flex flex-col gap-1.5">
+            <li>בשכיבה, עיניים עצומות, אוזניות אם אפשר. בלי טלפון ביד – האפליקציה יודעת לבד.</li>
+            <li>אל תנסה להבין את המילים. תן להן לעבור כמו מים. מה שרלוונטי יישאר.</li>
+            <li>בפרק השיא (רצועות 16–32) האפליקציה שותקת לגמרי – בלי נשימה, בלי אור. זה מכוון.</li>
+            <li>הנשימה המונחית נכנסת רק בפתיחות ובסיומים האינסטרומנטליים, לעולם לא מעל הקול.</li>
+            <li>אם משהו נהיה כבד – לחיצה ארוכה של שלוש שניות. יש דרך הביתה תמיד.</li>
+            <li>בסוף, לפני שאתה קם: שאלה אחת ליומן. זה החלק שבו המסע הופך לשלך.</li>
+          </ul>
+        </Section>
+        <p className="text-[12px] opacity-55 leading-relaxed">המדריך מלווה האזנה, נשימה ומדיטציה. הוא אינו מדריך לחומרים ואינו תחליף לליווי אנושי.</p>
+        <button onClick={onClose} className="rounded-2xl py-4 btn-psy text-[17px]">הבנתי</button>
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[12px] opacity-60 tracking-[0.25em] mb-1.5">{title}</div>
+      <div className="text-[15px] leading-relaxed opacity-90">{children}</div>
     </div>
   )
 }
