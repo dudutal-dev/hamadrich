@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { type Album, type Mode, type Phase, db } from '../db'
 import { INTENTIONS, INTENTION_META, MODE_LONG, MODE_META, PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
 
@@ -123,8 +124,8 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         התחל {MODE_META[mode].name} · {minutes} דק'
       </button>
 
-      {info && (
-        <div className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-xl flex items-end" onClick={() => setInfo(null)}>
+      {info && createPortal(
+        <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={() => setInfo(null)}>
           <div className="fade-in w-full rounded-t-[32px] p-6 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-4" style={{ background: `linear-gradient(180deg, ${MODE_GRAD[info][0]}33, #15112A 40%)`, border: '1px solid rgba(242,238,230,0.12)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-ink/30 self-center -mt-2" />
             <div className="flex items-center gap-3"><span className="text-[28px]" style={{ color: MODE_GRAD[info][0] }}>{MODE_ICON[info]}</span><h2 className="text-[26px] font-normal">{MODE_META[info].name}</h2></div>
@@ -138,7 +139,8 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
             </div>
             <button onClick={() => { pick(info); setInfo(null) }} className="rounded-2xl py-4 btn-psy text-[17px] mt-2">בחר {MODE_META[info].name}</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
