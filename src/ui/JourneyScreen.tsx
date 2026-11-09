@@ -4,6 +4,7 @@ import { type EngineState, type SessionEngine, BREATH_PATTERNS } from '../engine
 import { PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import { Cosmos } from './Cosmos'
 import { Orb } from './Orb'
+import { CastSheet } from './CastSheet'
 import { g, useAddress } from '../address'
 
 const BREATH_WORD = { inhale: 'שאיפה', hold: 'החזק', exhale: 'נשיפה', hold2: 'החזק', none: '' } as const
@@ -16,15 +17,22 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const [confirmExit, setConfirmExit] = useState(false)
   const [awake, setAwake] = useState(true)
   const [hint, setHint] = useState(true)
+  const [tv, setTvState] = useState(() => { try { return localStorage.getItem('hamadrich:tv') === '1' } catch { return false } })
+  const setTv = (v: boolean) => { setTvState(v); try { localStorage.setItem('hamadrich:tv', v ? '1' : '0') } catch { /* */ } }
+  const [castOpen, setCastOpen] = useState(false)
+  const [vp, setVp] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
   const pressStart = useRef(0)
   const touchY = useRef(0)
   const wasAsleep = useRef(false)
   const wakeLock = useRef<WakeLockSentinel | null>(null)
+  const orbRef = useRef<HTMLDivElement>(null)
+  const orbCenter = () => { const r = orbRef.current?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }
   const endedRef = useRef(false)
   const isAlbum = engine.plan.mode === 'album'
   const a = useAddress()
 
   useEffect(() => { const off = engine.on(setS); return () => { off() } }, [engine])
+  useEffect(() => { const on = () => setVp({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on) }, [])
   useEffect(() => { const id = setTimeout(() => setHint(false), 9000); return () => clearTimeout(id) }, [])
   useEffect(() => {
     if (!awake) return
@@ -32,10 +40,11 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     return () => clearTimeout(id)
   }, [awake])
   useEffect(() => {
-    const want = s.phase !== 3 && 'wakeLock' in navigator
+    // TV mode keeps the screen on all the way (it is being watched / mirrored); otherwise the peak lets it sleep
+    const want = (tv || s.phase !== 3) && 'wakeLock' in navigator
     if (want && !wakeLock.current) navigator.wakeLock.request('screen').then((l) => { wakeLock.current = l }).catch(() => {})
     if (!want && wakeLock.current) { void wakeLock.current.release(); wakeLock.current = null }
-  }, [s.phase])
+  }, [s.phase, tv])
   useEffect(() => () => { void wakeLock.current?.release() }, [])
   useEffect(() => {
     if (s.done && !endedRef.current) { endedRef.current = true; setTimeout(() => onEnd(Math.round(s.t), true), 2500) }
@@ -70,8 +79,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const stepSec = s.breath === 'inhale' ? pat.inhale : s.breath === 'exhale' ? pat.exhale : s.breath === 'hold' ? pat.hold : pat.hold2
   const breathIntensity = s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.phase === 3 ? 0.7 : 0.4
   const peak = s.phase === 3 && !s.paused
-  const dimAll = peak && !awake
-  const ui = { opacity: awake ? 1 : 0.6, transition: 'opacity 1200ms' }
+  const dimAll = peak && !awake && !tv
+  const ui = { opacity: awake ? 1 : tv ? 0 : 0.6, transition: 'opacity 1200ms', pointerEvents: (tv && !awake ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] }
+  const landscape = vp.w > vp.h
+  const orbSize = Math.round(tv ? Math.min(vp.w, vp.h) * (landscape ? 0.66 : 0.72) : Math.min(290, vp.h * 0.38, vp.w * 0.78))
 
   if (emergency) {
     return (
@@ -90,7 +101,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   return (
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
       className="h-full relative flex flex-col items-center select-none touch-none overflow-hidden" style={{ background: '#070510' }}>
-      <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} levels={() => engine.levels()} />
+      <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} levels={() => engine.levels()} focus={orbCenter} />
 
       {/* top bar */}
       <div className="relative w-full flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={ui}>
@@ -99,16 +110,21 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
           <div className="text-[16px] font-semibold tracking-[0.12em]" style={{ color: color2, textShadow: `0 0 12px ${color2}` }}>{s.phaseName}</div>
           <div className="text-[13px] opacity-75 mt-0.5">{engine.plan.intention}</div>
         </div>
-        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full btn-ghost bg-bg/40 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
+        <div className="flex gap-2">
+          <button onClick={() => setCastOpen(true)} aria-label="שידור למכשיר" className="w-12 h-12 rounded-full btn-ghost bg-bg/40 backdrop-blur flex items-center justify-center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" /><path d="M3 12a9 9 0 0 1 9 9" /><path d="M3 16a5 5 0 0 1 5 5" /><path d="M3 20h.01" /></svg>
+          </button>
+          <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full btn-ghost bg-bg/40 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
+        </div>
       </div>
 
       {/* center */}
-      <div className="relative flex-1 flex flex-col items-center justify-start pt-6">
-        <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={290} />
-        <div className="h-20 mt-8 flex flex-col items-center" style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
+      <div className={`relative flex-1 flex ${tv && landscape ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${tv ? 'justify-center' : 'justify-start pt-6'}`}>
+        <div ref={orbRef}><Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} /></div>
+        <div className={`${tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
           {s.breath !== 'none' && !s.paused ? (
             <>
-              <div className="text-[28px] font-semibold tracking-wide" style={{ textShadow: `0 0 28px ${color2}` }}>{BREATH_WORD[s.breath]}</div>
+              <div className={`${tv ? 'text-[clamp(32px,6vmin,72px)]' : 'text-[28px]'} font-semibold tracking-wide`} style={{ textShadow: `0 0 28px ${color2}` }}>{BREATH_WORD[s.breath]}</div>
               <div className="text-[14px] opacity-75 mt-1">{pat.label}</div>
             </>
           ) : (
@@ -117,8 +133,15 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
         </div>
       </div>
 
+      {/* TV mode: quiet corner info instead of the player */}
+      {tv && (
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+14px)] inset-x-0 flex justify-between px-6 text-[clamp(13px,2vmin,20px)] tabular-nums pointer-events-none" style={{ opacity: 0.55 }}>
+          <span style={{ color: color2 }}>{s.phaseName}</span><span>-{fmt(remaining)}</span>
+        </div>
+      )}
+
       {/* player */}
-      <div data-ui className="relative w-full px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] flex flex-col gap-3" style={ui} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+      {!tv && <div data-ui className="relative w-full px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] flex flex-col gap-3" style={ui} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
         {/* phase strip (tap to jump) */}
         <div className="flex gap-1 h-2.5 rounded-full overflow-hidden">
           {spans.map((p) => {
@@ -149,14 +172,16 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
           <input type="range" min={0} max={1} step={0.02} value={s.musicGain} onChange={(e) => engine.setMusicGain(+e.target.value)} className="flex-1" />
           <span className="text-[14px] opacity-75">🔊</span>
         </div>
-      </div>
+      </div>}
 
-      {hint && !s.done && (
+      {hint && !s.done && !tv && (
         <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+190px)] text-center text-[13px] opacity-80 leading-relaxed px-10" style={{ textShadow: '0 1px 8px #000' }}>
           נגיעה במרכז – עצירה · לחיצה ארוכה – +10 דק' · החלקה למעלה – לחזרה · 3 שניות – חירום
         </div>
       )}
       {toast && <div className="fade-in absolute top-[calc(env(safe-area-inset-top)+70px)] text-[15px] px-4 py-2 rounded-full" style={{ background: 'rgba(14,11,24,0.6)', backdropFilter: 'blur(10px)' }}>{toast}</div>}
+
+      {castOpen && <CastSheet getMedia={() => engine.castMedia()} tv={tv} onTv={setTv} onClose={() => setCastOpen(false)} />}
 
       {confirmExit && (
         <div className="absolute inset-0 z-20 bg-bg/85 backdrop-blur-xl flex flex-col items-center justify-center px-8 gap-3 fade-in" data-ui onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>

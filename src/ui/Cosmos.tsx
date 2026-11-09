@@ -9,6 +9,8 @@ interface Props {
   ambient?: boolean
   /** live audio levels; when provided the visual moves with the music */
   levels?: () => { bass: number; mid: number; high: number; energy: number }
+  /** where the light core sits (px, viewport) – e.g. the orb's center; default: upper third */
+  focus?: () => { x: number; y: number } | null
 }
 
 const hexToRgb = (c: string) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255] as const }
@@ -18,10 +20,10 @@ const mix = (a: string, b: string, t: number) => { const A = hexToRgb(a), B = he
 /** Nebula palette like the reference: salmon/peach clouds, magenta, cyan streaks, hot white core — tinted toward the phase colors */
 const NEB = { peach: '#EBA17A', rose: '#B3A4F2', magenta: '#8E86E8', cyan: '#7CCFBE', violet: '#6F78E0', gold: '#F2C26B', coral: '#E39470' }
 
-export function Cosmos({ color, color2, intensity, phase, paused, ambient = false, levels }: Props) {
+export function Cosmos({ color, color2, intensity, phase, paused, ambient = false, levels, focus }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const st = useRef({ color, color2, intensity, phase, paused, ambient, levels })
-  useLayoutEffect(() => { st.current = { color, color2, intensity, phase, paused, ambient, levels } })
+  const st = useRef({ color, color2, intensity, phase, paused, ambient, levels, focus })
+  useLayoutEffect(() => { st.current = { color, color2, intensity, phase, paused, ambient, levels, focus } })
 
   useEffect(() => {
     const cv = ref.current!
@@ -67,7 +69,8 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
       const drive = s.ambient ? 0.5 : 1
       const pulse = Math.min(1, s.intensity * 0.35 + bass * 0.45 + beat * 0.35)
 
-      const cx = w / 2, cy = s.ambient ? h * 0.2 : h * 0.31
+      const f = s.focus?.()
+      const cx = f ? f.x : w / 2, cy = f ? f.y : s.ambient ? h * 0.2 : h * 0.31
       const peak = s.phase === 3
       const c1 = s.color, c2 = s.color2
 

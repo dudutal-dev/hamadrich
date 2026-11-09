@@ -158,6 +158,7 @@ class Track {
   constructor(private ctx: AudioContext, out: AudioNode, blob: Blob, loop: boolean, gainDb: number, fadeIn: number, private direct = false, private busGain = 1, analyser: AnalyserNode | null = null) {
     this.url = URL.createObjectURL(blob)
     this.el = new Audio()
+    this.el.setAttribute('x-webkit-airplay', 'allow') // AirPlay picker can target this element
     this.el.src = this.url
     this.el.loop = loop
     this.el.preload = 'auto'
@@ -201,6 +202,8 @@ class Track {
   /** iOS may have paused the element while backgrounded; if we are supposed to be playing, play again */
   kick() { if (this.el.paused && !this.el.ended && this.el.src) void this.el.play().catch(() => {}) }
   get ended() { return this.el.ended }
+  /** the audible media element (for AirPlay / Remote Playback) */
+  get media() { return this.el }
   stop(fade: number) {
     if (this.direct) { this.fadeTo(0, fade) } else if (this.gain) {
       const t = this.ctx.currentTime
@@ -603,6 +606,9 @@ export class SessionEngine {
     if (this.plan.mode === 'album') void renderDroneBlob(this.state.phase, this.output, this.binaural).catch(() => {})
     this.emit()
   }
+
+  /** media element currently playing (music track or rendered drone) – target for AirPlay / Chromecast */
+  castMedia(): HTMLAudioElement | null { return this.current instanceof Track ? this.current.media : null }
 
   /** jump to next / previous music cue (album mode) */
   nextTrack() { this.jumpTrack(1) }
