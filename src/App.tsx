@@ -12,6 +12,7 @@ import { AlbumScreen } from './ui/AlbumScreen'
 import { NavIcon } from './ui/NavIcon'
 import { takeJustUpdated } from './version'
 import { getAddress } from './address'
+import { bodyJourney } from './engine/body'
 
 // read once per page load: set right before an auto-update reload
 const justUpdated = takeJustUpdated()
@@ -43,7 +44,7 @@ export default function App() {
     const music = (await db.assets.where('kind').equals('music').toArray()).filter((a) => !a.albumId)
     const album = c.albumId ? await db.albums.get(c.albumId) : undefined
     const albumTracks = c.albumId ? await db.assets.where('albumId').equals(c.albumId).toArray() : undefined
-    const p = buildPlan({ address: getAddress(), mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
+    const p = buildPlan({ address: getAddress(), journey: c.journey, mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
     await db.plans.put(p)
     setPlan(p)
     setStage('prepare')
@@ -72,7 +73,7 @@ export default function App() {
 
   if (stage === 'prepare' && choice) return <PrepareScreen mode={choice.mode} loading={loading} onBegin={onBegin} onCancel={() => setStage('start')} />
   if (stage === 'journey' && engine && settings) return <JourneyScreen engine={engine} settings={settings} onEnd={onEnd} />
-  if (stage === 'integration' && draft) return <IntegrationScreen draft={draft} onDone={reset} />
+  if (stage === 'integration' && draft) return <IntegrationScreen draft={draft} question={bodyJourney(plan?.journey)?.question} onDone={reset} />
 
   return (
     <div className="h-full overflow-y-auto relative isolate">

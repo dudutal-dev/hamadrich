@@ -18,6 +18,8 @@ export const BREATH_PATTERNS: Record<BreathPattern, { inhale: number; hold: numb
   '478': { inhale: 4, hold: 7, exhale: 8, hold2: 0, label: '4-7-8' },
   coherent: { inhale: 5.5, hold: 0, exhale: 5.5, hold2: 0, label: 'קוהרנטית' },
   box: { inhale: 4, hold: 4, exhale: 4, hold2: 4, label: 'קופסה' },
+  wave: { inhale: 6, hold: 0, exhale: 8, hold2: 0, label: 'נשימת גל' },
+  fire: { inhale: 1, hold: 0, exhale: 1, hold2: 0, label: 'נשימת אש' },
 }
 
 export type BreathStep = 'inhale' | 'hold' | 'exhale' | 'hold2' | 'none'
@@ -555,7 +557,8 @@ export class SessionEngine {
 
   /** Breath sound: inhale through the nose / exhale through the mouth, the clip closest to the step length, alternating takes */
   private breathTone(step: BreathStep, dur: number) {
-    if (!this.ctx || !dur || (step !== 'inhale' && step !== 'exhale')) return
+    // fast breathing (fire): too short for a recorded breath – orb + haptics only
+    if (!this.ctx || !dur || dur < 2.5 || (step !== 'inhale' && step !== 'exhale')) return
     const lens = step === 'inhale' ? [4, 5.5] : [4, 5.5, 8]
     const len = lens.reduce((a, b) => (Math.abs(b - dur) < Math.abs(a - dur) ? b : a))
     this.breathAlt = (this.breathAlt + 1) % 2

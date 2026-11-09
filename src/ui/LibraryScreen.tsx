@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { type Album, type Asset, type Phase, type Settings, db, getSettings } from '../db'
 import { deleteAlbum, importAlbum, importMusic } from '../engine/library'
-import { VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceGroup, clipText, voiceUrl } from '../engine/voice'
+import { BODY_CLIPS, VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceClip, type VoiceGroup, clipText, voiceUrl } from '../engine/voice'
+import { BODY_JOURNEYS, isAdultUnlocked } from '../engine/body'
 import { g, useAddress } from '../address'
 import { AddressPicker } from './AddressPicker'
 import { PHASE_NAMES } from '../engine/plan'
@@ -38,15 +39,17 @@ function Narration() {
     const el = new Audio(voiceUrl(id, a)); el.onended = () => setPlaying(null)
     audio.current = el; void el.play().catch(() => setPlaying(null)); setPlaying(id)
   }
-  const groups = (Object.keys(VOICE_GROUP_NAMES) as VoiceGroup[]).map((g) => ({ g, clips: VOICE_CLIPS.filter((c) => c.group === g) }))
+  const groups: { key: string; label: string; clips: VoiceClip[] }[] = (Object.keys(VOICE_GROUP_NAMES) as VoiceGroup[]).filter((g) => g !== 'body').map((g) => ({ key: g, label: VOICE_GROUP_NAMES[g], clips: VOICE_CLIPS.filter((c) => c.group === g) }))
+  // body & sexuality journeys (level 2 only after the 18+ confirmation); clips for the other gender are hidden
+  for (const j of BODY_JOURNEYS) if (j.level === 1 || isAdultUnlocked()) groups.push({ key: j.id, label: `גוף ומיניות · ${j.title}`, clips: BODY_CLIPS.filter((c) => c.journey === j.id && (!c.only || c.only === a)) })
   const total = Math.round(VOICE_CLIPS.reduce((t, c) => t + c.dur, 0) / 60)
   return (
     <div className="flex flex-col gap-5">
       <AddressPicker />
       <p className="text-[14px] muted leading-relaxed">{VOICE_CLIPS.length} קטעי קריינות בעברית · כ-{total} דקות · קול "המדריך". הם משולבים במסע לפי המצב, הכוונה והשלב, ועובדים גם בלי רשת.</p>
-      {groups.map(({ g, clips }) => (
-        <section key={g} className="flex flex-col gap-2">
-          <div className="label">{VOICE_GROUP_NAMES[g]}</div>
+      {groups.map(({ key, label, clips }) => (
+        <section key={key} className="flex flex-col gap-2">
+          <div className="label">{label}</div>
           {clips.map((c) => (
             <div key={c.id} className="card rounded-2xl p-4 flex gap-3 items-start">
               <button onClick={() => toggle(c.id)} aria-label="האזן" className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-[14px] ${playing === c.id ? 'btn-psy' : 'btn-ghost'}`}>{playing === c.id ? '■' : '▶'}</button>

@@ -10,8 +10,8 @@ interface SRInstance { lang: string; continuous: boolean; interimResults: boolea
 type SR = { new (): SRInstance }
 declare global { interface Window { webkitSpeechRecognition?: SR; SpeechRecognition?: SR } }
 
-export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDone: () => void }) {
-  const [q] = useState(() => QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)])
+export function IntegrationScreen({ draft, question, onDone }: { draft: JournalEntry; question?: string; onDone: () => void }) {
+  const [q] = useState(() => question ?? QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)])
   const [mood, setMood] = useState<number | null>(null)
   const [tags, setTags] = useState('')
   const [note, setNote] = useState('')

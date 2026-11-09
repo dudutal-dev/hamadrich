@@ -1,10 +1,10 @@
 import Dexie, { type Table } from 'dexie'
 
-export type Mode = 'breath' | 'meditation' | 'deep' | 'sleep' | 'album'
+export type Mode = 'breath' | 'meditation' | 'deep' | 'sleep' | 'album' | 'body'
 export type Phase = 1 | 2 | 3 | 4 | 5
 export type Layer = 'music' | 'voice' | 'breath' | 'visual'
 export type AssetKind = 'voice' | 'music' | 'recording'
-export type BreathPattern = 'none' | '478' | 'coherent' | 'box'
+export type BreathPattern = 'none' | '478' | 'coherent' | 'box' | 'wave' | 'fire'
 
 export interface TextItem {
   id: string
@@ -68,6 +68,8 @@ export interface SessionPlan {
   albumId?: string
   /** narration version used by this session */
   address?: 'm' | 'f'
+  /** body & sexuality journey id (mode 'body') */
+  journey?: string
   createdAt: string
 }
 
