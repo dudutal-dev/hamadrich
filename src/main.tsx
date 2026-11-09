@@ -14,7 +14,17 @@ registerSW({
     else reloadIntoUpdate()
   },
   onRegisteredSW(_url, r) {
-    if (r) setInterval(() => { if (document.visibilityState === 'visible') void r.update() }, 30 * 60 * 1000)
+    if (!r) return
+    setInterval(() => { if (document.visibilityState === 'visible') void r.update() }, 30 * 60 * 1000)
+    // tell the UI while a new version downloads (it is large: voice + music), so the listener keeps the app open
+    const say = (state: 'downloading' | 'done' | 'failed') => window.dispatchEvent(new CustomEvent('hamadrich:update', { detail: state }))
+    const watch = (w: ServiceWorker | null) => {
+      if (!w) return
+      say('downloading')
+      w.addEventListener('statechange', () => { if (w.state === 'installed' || w.state === 'activated') say('done'); if (w.state === 'redundant') say('failed') })
+    }
+    if (r.installing) watch(r.installing)
+    r.addEventListener('updatefound', () => watch(r.installing))
   },
 })
 // keep the app's files (voice, breath, music) permanently: ask the browser not to evict our storage under pressure

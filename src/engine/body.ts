@@ -14,17 +14,19 @@ export interface BodyJourney {
   question: string
   /** level 3 (couples): ordered steps – clip, on-screen label, phase, and relative share of the free (music) time after it */
   steps?: CoupleStep[]
+  /** built-in music loop per phase (public/music/<id>.mp3) */
+  music: Record<1 | 2 | 3 | 4 | 5, string>
 }
 export interface CoupleStep { clip: string; label: string; phase: 1 | 2 | 3 | 4 | 5; w: number; breath?: BreathPattern }
 
 export const BODY_JOURNEYS: BodyJourney[] = [
-  { id: 'home', level: 1, title: 'בית בגוף', sub: 'סריקת גוף. הגוף כבית, לא כמראה. מקום לעונג קטן.', defaultMin: 20, minMin: 15, maxMin: 40, breath: 'coherent', question: 'איפה בגוף הרגשתי הכי בבית?' },
-  { id: 'desire', level: 1, title: 'תשוקה ונוכחות', sub: 'נשימה לאגן. תשוקה כאנרגיה חיה, בלי מטרה.', defaultMin: 25, minMin: 15, maxMin: 40, breath: 'wave', question: 'מה הגוף שלי אוהב, שלא נתתי לו מקום?' },
-  { id: 'shame', level: 1, title: 'לשחרר בושה', sub: 'המסרים שקיבלנו על הגוף, והחזרה שלו אליך.', defaultMin: 25, minMin: 20, maxMin: 40, breath: 'coherent', question: 'מה הגוף שלי צריך לשמוע ממני?' },
-  { id: 'touch', level: 2, title: 'מגע מודע', sub: 'מגע עצמי איטי: ידיים, מפת הגוף, ובסוף מגע אינטימי – רק אם נכון.', defaultMin: 25, minMin: 20, maxMin: 45, breath: 'wave', question: 'איזה מגע הגוף שלי ביקש, שלא ידעתי?' },
-  { id: 'fire', level: 2, title: 'נשימת אש', sub: 'רצפת האגן, גל חום בעמוד השדרה, עוררות כאנרגיה שמתפשטת.', defaultMin: 20, minMin: 15, maxMin: 35, breath: 'wave', question: 'איפה הרגשתי את האנרגיה, ולאן היא רצתה לזרום?' },
-  { id: 'pleasure', level: 2, title: 'עונג בלי יעד', sub: 'עונג עצמי מודע: האטה, גלים של עלייה ומנוחה, בלי שיא כמטרה.', defaultMin: 30, minMin: 20, maxMin: 50, breath: 'wave', question: 'מה השתנה כשהאטתי?' },
-  { id: 'breathe2', level: 3, title: 'נשימה משותפת', sub: 'מבט בעיניים, נשימה מסונכרנת, יד על הלב, מילים טובות.', defaultMin: 25, minMin: 20, maxMin: 40, breath: 'wave', question: 'מה הרגשנו כשהנשימות נפגשו?', steps: [
+  { id: 'home', music: { 1: 'body-1a', 2: 'body-1a', 3: 'body-1b', 4: 'body-1b', 5: 'body-1b' }, level: 1, title: 'בית בגוף', sub: 'סריקת גוף. הגוף כבית, לא כמראה. מקום לעונג קטן.', defaultMin: 20, minMin: 15, maxMin: 40, breath: 'coherent', question: 'איפה בגוף הרגשתי הכי בבית?' },
+  { id: 'desire', music: { 1: 'body-1a', 2: 'body-1a', 3: 'body-1b', 4: 'body-1b', 5: 'body-1b' }, level: 1, title: 'תשוקה ונוכחות', sub: 'נשימה לאגן. תשוקה כאנרגיה חיה, בלי מטרה.', defaultMin: 25, minMin: 15, maxMin: 40, breath: 'wave', question: 'מה הגוף שלי אוהב, שלא נתתי לו מקום?' },
+  { id: 'shame', music: { 1: 'body-1a', 2: 'body-1a', 3: 'body-1b', 4: 'body-1b', 5: 'body-1b' }, level: 1, title: 'לשחרר בושה', sub: 'המסרים שקיבלנו על הגוף, והחזרה שלו אליך.', defaultMin: 25, minMin: 20, maxMin: 40, breath: 'coherent', question: 'מה הגוף שלי צריך לשמוע ממני?' },
+  { id: 'touch', music: { 1: 'body-2a', 2: 'body-2a', 3: 'body-2b', 4: 'body-2b', 5: 'body-2b' }, level: 2, title: 'מגע מודע', sub: 'מגע עצמי איטי: ידיים, מפת הגוף, ובסוף מגע אינטימי – רק אם נכון.', defaultMin: 25, minMin: 20, maxMin: 45, breath: 'wave', question: 'איזה מגע הגוף שלי ביקש, שלא ידעתי?' },
+  { id: 'fire', music: { 1: 'body-2a', 2: 'fire', 3: 'fire', 4: 'body-2b', 5: 'body-2b' }, level: 2, title: 'נשימת אש', sub: 'רצפת האגן, גל חום בעמוד השדרה, עוררות כאנרגיה שמתפשטת.', defaultMin: 20, minMin: 15, maxMin: 35, breath: 'wave', question: 'איפה הרגשתי את האנרגיה, ולאן היא רצתה לזרום?' },
+  { id: 'pleasure', music: { 1: 'body-2a', 2: 'body-2a', 3: 'body-2b', 4: 'body-2b', 5: 'body-2b' }, level: 2, title: 'עונג בלי יעד', sub: 'עונג עצמי מודע: האטה, גלים של עלייה ומנוחה, בלי שיא כמטרה.', defaultMin: 30, minMin: 20, maxMin: 50, breath: 'wave', question: 'מה השתנה כשהאטתי?' },
+  { id: 'breathe2', music: { 1: 'couple-a', 2: 'couple-a', 3: 'couple-b', 4: 'couple-b', 5: 'couple-b' }, level: 3, title: 'נשימה משותפת', sub: 'מבט בעיניים, נשימה מסונכרנת, יד על הלב, מילים טובות.', defaultMin: 25, minMin: 20, maxMin: 40, breath: 'wave', question: 'מה הרגשנו כשהנשימות נפגשו?', steps: [
     { clip: 'c-b-open', label: 'שניכם · מול זה מול זו', phase: 1, w: 1 },
     { clip: 'c-b-gaze', label: 'שניכם · מבט בעיניים', phase: 1, w: 5 },
     { clip: 'c-b-sync', label: 'שניכם · נשימה משותפת', phase: 2, w: 6, breath: 'wave' },
@@ -35,7 +37,7 @@ export const BODY_JOURNEYS: BodyJourney[] = [
     { clip: 'c-b-her-words', label: 'היא מדברת', phase: 4, w: 2 },
     { clip: 'c-b-close', label: 'שניכם · חיבוק', phase: 5, w: 2 },
   ] },
-  { id: 'listen', level: 3, title: 'מגע שמקשיב', sub: 'מגע בתורות: היא מקבלת והוא נותן, ואז מחליפים. יותר · פחות · בדיוק.', defaultMin: 45, minMin: 30, maxMin: 70, breath: 'none', question: 'מה למדנו על המגע שכל אחד מאיתנו אוהב?', steps: [
+  { id: 'listen', music: { 1: 'couple-a', 2: 'couple-a', 3: 'couple-a', 4: 'couple-b', 5: 'couple-b' }, level: 3, title: 'מגע שמקשיב', sub: 'מגע בתורות: היא מקבלת והוא נותן, ואז מחליפים. יותר · פחות · בדיוק.', defaultMin: 45, minMin: 30, maxMin: 70, breath: 'none', question: 'מה למדנו על המגע שכל אחד מאיתנו אוהב?', steps: [
     { clip: 'c-l-open', label: 'שניכם · פתיחה', phase: 1, w: 0.3 },
     { clip: 'c-l-stop', label: 'שניכם · מילת עצירה', phase: 1, w: 0.4 },
     { clip: 'c-l-feedback', label: 'יותר · פחות · בדיוק', phase: 1, w: 0.2 },
@@ -51,7 +53,7 @@ export const BODY_JOURNEYS: BodyJourney[] = [
     { clip: 'c-l-share', label: 'שניכם · שיתוף', phase: 5, w: 3 },
     { clip: 'c-l-close', label: 'שניכם', phase: 5, w: 0.5 },
   ] },
-  { id: 'desire2', level: 3, title: 'ערב של תשוקה', sub: 'טקס פתיחה, ריקוד איטי, מגע בתורות ומגע משותף – ואז "מכאן זה שלכם".', defaultMin: 60, minMin: 40, maxMin: 90, breath: 'none', question: 'מה נרצה להביא איתנו לערב הבא?', steps: [
+  { id: 'desire2', music: { 1: 'groove', 2: 'groove', 3: 'couple-a', 4: 'couple-b', 5: 'couple-b' }, level: 3, title: 'ערב של תשוקה', sub: 'טקס פתיחה, ריקוד איטי, מגע בתורות ומגע משותף – ואז "מכאן זה שלכם".', defaultMin: 60, minMin: 40, maxMin: 90, breath: 'none', question: 'מה נרצה להביא איתנו לערב הבא?', steps: [
     { clip: 'c-d-open', label: 'שניכם · טקס פתיחה', phase: 1, w: 1 },
     { clip: 'c-d-dance', label: 'שניכם · ריקוד איטי', phase: 1, w: 2 },
     { clip: 'c-d-him-lead', label: 'הוא מוביל', phase: 2, w: 2 },
@@ -76,3 +78,8 @@ export const unlockAdult = () => { try { localStorage.setItem(ADULT_KEY, '1') } 
 const COUPLE_KEY = 'hamadrich:couple'
 export const isCoupleUnlocked = () => { try { return localStorage.getItem(COUPLE_KEY) === '1' } catch { return false } }
 export const unlockCouple = () => { try { localStorage.setItem(COUPLE_KEY, '1') } catch { /* private mode */ } }
+
+export const MUSIC_TITLES: Record<string, string> = {
+  'body-1a': 'אמביינט חם', 'body-1b': 'מרחב עמוק', 'body-2a': 'חושני · דופק איטי', 'body-2b': 'חושני · עמוק',
+  fire: 'תוף טקסי', 'couple-a': 'אינטימי', 'couple-b': 'לילה', groove: 'גרוב איטי',
+}

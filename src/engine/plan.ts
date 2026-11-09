@@ -211,10 +211,11 @@ function buildBodyPlan(input: BuildInput): SessionPlan {
   }
   const bp: BreathPattern = input.breathEnabled ? j.breath : 'none'
   let cues: Cue[] = []
+  let lastTrack = ''
   for (const { n, startSec: s, endSec: e } of phases) {
     const L = e - s
     cues.push({ t: s, layer: 'visual', action: 'phase', phase: n })
-    cues.push({ t: s, layer: 'music', action: 'play' }) // phase drone
+    if (j.music[n] !== lastTrack) { cues.push({ t: s, layer: 'music', action: 'play', track: j.music[n] }); lastTrack = j.music[n] } // journey music, restarts only when it changes
     cues.push({ t: s, layer: 'breath', action: 'pattern', pattern: 'none' })
     if (n === 1) {
       for (const c of role('open')) put(s + 6, c.id)
@@ -265,13 +266,14 @@ function buildCouplePlan(input: BuildInput, j: BodyJourney): SessionPlan {
   let cues: Cue[] = []
   const phases: PhaseSpan[] = []
   let t = lead
+  let lastTrack = ''
   cues.push({ t: 0, layer: 'breath', action: 'pattern', pattern: 'none' })
   for (const st of steps) {
     if (phases[phases.length - 1]?.n !== st.phase) {
       if (phases.length) phases[phases.length - 1].endSec = t - 1
       phases.push({ n: st.phase, startSec: phases.length ? t - 1 : 0, endSec: t })
       cues.push({ t: phases[phases.length - 1].startSec, layer: 'visual', action: 'phase', phase: st.phase })
-      cues.push({ t: phases[phases.length - 1].startSec, layer: 'music', action: 'play' })
+      if (j.music[st.phase] !== lastTrack) { cues.push({ t: phases[phases.length - 1].startSec, layer: 'music', action: 'play', track: j.music[st.phase] }); lastTrack = j.music[st.phase] }
     }
     cues.push({ t, layer: 'visual', action: 'label', label: st.label })
     if (input.voiceEnabled) cues.push({ t, layer: 'voice', action: 'play', clip: st.clip, duck: -8 })

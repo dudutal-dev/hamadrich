@@ -1,6 +1,7 @@
 import { type Asset, type BreathPattern, type Cue, type Phase, type SessionPlan, db } from '../db'
 import { PHASE_NAMES } from './plan'
 import { voiceUrl } from './voice'
+import { MUSIC_TITLES } from './body'
 
 const XFADE = 30 // seconds
 
@@ -364,6 +365,11 @@ export class SessionEngine {
       try { this.buffers.set(a.id, await ctx.decodeAudioData(await a.blob.arrayBuffer())) } catch (e) { console.warn('decode failed', a.name, e) }
     }))
     await this.loadBreathClips(ctx)
+    // built-in journey music (body & couple journeys), shipped in public/music and precached
+    const trackIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'music' && c.track).map((c) => c.track as string))]
+    await Promise.all(trackIds.map(async (id) => {
+      try { const r = await fetch(`${import.meta.env.BASE_URL}music/${id}.mp3`); if (r.ok) { this.blobs.set(`track:${id}`, await r.blob()); this.names.set(`track:${id}`, MUSIC_TITLES[id] ?? '') } } catch { /* falls back to the drone */ }
+    }))
     const music = await db.assets.bulkGet(musicIds)
     music.forEach((a?: Asset) => { if (a) { this.blobs.set(a.id, a.blob); this.names.set(a.id, a.name) } })
     // phases that will use the built-in drone → pre-render to looping files (background-safe)
@@ -509,7 +515,11 @@ export class SessionEngine {
     }
     if (c.layer === 'music' && c.action === 'play') {
       const prev = this.current
-      if (c.asset && this.blobs.has(c.asset)) {
+      if (c.track && this.blobs.has(`track:${c.track}`)) {
+        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(`track:${c.track}`)!, true, 0, prev ? 8 : 4, true, this.gains.music, this.analyser)
+        prev?.stop(8)
+        this.state.trackName = this.names.get(`track:${c.track}`) ?? ''
+      } else if (c.asset && this.blobs.has(c.asset)) {
         const isAlbum = this.plan.mode === 'album'
         this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music, this.analyser)
         prev?.stop(isAlbum ? 1.5 : XFADE)

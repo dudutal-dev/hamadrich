@@ -53,6 +53,8 @@ export interface Cue {
   asset?: string
   /** built-in narration clip id (public/voice) */
   clip?: string
+  /** built-in music loop id (public/music) */
+  track?: string
   pattern?: BreathPattern
   phase?: Phase
   duck?: number
