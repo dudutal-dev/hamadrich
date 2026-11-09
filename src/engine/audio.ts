@@ -1,5 +1,6 @@
 import { type Asset, type BreathPattern, type Cue, type Phase, type SessionPlan, db } from '../db'
 import { PHASE_NAMES } from './plan'
+import { voiceUrl } from './voice'
 
 const XFADE = 30 // seconds
 
@@ -340,6 +341,14 @@ export class SessionEngine {
     // drone/voice/breath also feed the analyser (via the music bus tap)
     this.musicBus.connect(this.analyser)
     // preload: voice cues are decoded (short); music stays as blobs and streams
+    // built-in narration clips used by this plan (+ the emergency anchor), fetched from the app bundle (precached → offline)
+    const clipIds = [...new Set([...this.plan.cues.filter((c) => c.layer === 'voice' && c.clip).map((c) => c.clip as string), 'emergency'])]
+    await Promise.all(clipIds.map(async (id) => {
+      try {
+        const r = await fetch(voiceUrl(id))
+        if (r.ok) this.buffers.set(`clip:${id}`, await ctx.decodeAudioData(await r.arrayBuffer()))
+      } catch (e) { console.warn('voice clip failed', id, e) }
+    }))
     const voiceIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'voice' && c.asset).map((c) => c.asset as string))]
     const musicIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'music' && c.asset).map((c) => c.asset as string))]
     const voices = await db.assets.bulkGet(voiceIds)
@@ -450,6 +459,21 @@ export class SessionEngine {
     else this.finish()
   }
 
+  /** narration over the voice bus, ducking the music (graph bus + direct media element) for its length */
+  private voiceSrc: AudioBufferSourceNode | null = null
+  private playVoice(buf: AudioBuffer, duckDb: number) {
+    if (!this.ctx) return
+    try { this.voiceSrc?.stop() } catch { /* already ended */ }
+    const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.voiceBus); s.start()
+    this.voiceSrc = s
+    const duck = Math.pow(10, duckDb / 20)
+    const now = this.ctx.currentTime
+    this.musicBus.gain.cancelScheduledValues(now)
+    this.musicBus.gain.setTargetAtTime(this.gains.music * duck, now, 0.8)
+    this.musicBus.gain.setTargetAtTime(this.gains.music, now + buf.duration + 1, 1.5)
+    if (this.current instanceof Track) { this.current.duck(duck, 0.8); setTimeout(() => (this.current instanceof Track) && this.current.duck(1, 1.5), (buf.duration + 1) * 1000) }
+  }
+
   private playDrone(phase: Phase, fade: number, binaural = this.binaural, name = '') {
     if (!this.ctx) return
     const prev = this.current
@@ -486,16 +510,8 @@ export class SessionEngine {
         this.playDrone(this.state.phase, XFADE)
       }
     }
-    if (c.layer === 'voice' && c.action === 'play' && c.asset && this.buffers.has(c.asset)) {
-      const buf = this.buffers.get(c.asset)!
-      const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.voiceBus); s.start()
-      const duck = Math.pow(10, (c.duck ?? -6) / 20)
-      const now = this.ctx.currentTime
-      this.musicBus.gain.cancelScheduledValues(now)
-      this.musicBus.gain.setTargetAtTime(this.gains.music * duck, now, 0.8)
-      this.musicBus.gain.setTargetAtTime(this.gains.music, now + buf.duration + 1, 1.5)
-      if (this.current instanceof Track) { this.current.duck(duck, 0.8); setTimeout(() => (this.current instanceof Track) && this.current.duck(1, 1.5), (buf.duration + 1) * 1000) }
-    }
+    const vkey = c.clip ? `clip:${c.clip}` : c.asset
+    if (c.layer === 'voice' && c.action === 'play' && vkey && this.buffers.has(vkey)) this.playVoice(this.buffers.get(vkey)!, c.duck ?? -6)
     if (c.layer === 'breath' && c.action === 'pattern') {
       this.breathPattern = c.pattern ?? 'none'
       this.breathStart = this.elapsed
@@ -652,6 +668,8 @@ export class SessionEngine {
     this.calmMode = true
     this.pendingMusic = null
     this.playDrone(5, 4, false, 'עיגון')
+    const anchor = this.buffers.get('clip:emergency')
+    if (anchor) setTimeout(() => { if (this.calmMode) this.playVoice(anchor, -9) }, 2500)
     this.breathPattern = 'coherent'; this.breathStart = this.elapsed; this.state.breathPattern = 'coherent'
     if (this.state.paused) this.resume()
     this.emit()

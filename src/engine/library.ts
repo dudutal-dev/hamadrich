@@ -1,4 +1,4 @@
-import { type Album, type Asset, type Phase, type TextItem, db, uid } from '../db'
+import { type Album, type Asset, type Phase, db, uid } from '../db'
 import { defaultAlbumPhaseMap } from './plan'
 import JSZip from 'jszip'
 
@@ -81,22 +81,6 @@ export async function deleteAlbum(id: string) {
   await db.albums.delete(id)
 }
 
-/** ElevenLabs TTS: produce a voice asset for a text and attach it */
-export async function synthesizeVoice(text: TextItem, apiKey: string, voiceId: string): Promise<Asset> {
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    method: 'POST',
-    headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: text.body, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.75, similarity_boost: 0.8, style: 0.15, speed: 0.85 } }),
-  })
-  if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${await res.text()}`)
-  const blob = await res.blob()
-  const asset: Asset = { id: uid(), kind: 'voice', name: text.title, blob, mime: 'audio/mpeg', durationSec: await measureDuration(blob), phases: text.phases, gainDb: 0, createdAt: new Date().toISOString() }
-  await db.assets.add(asset)
-  if (text.voiceAssetId) await db.assets.delete(text.voiceAssetId).catch(() => {})
-  await db.texts.update(text.id, { voiceAssetId: asset.id, estSec: asset.durationSec || text.estSec })
-  return asset
-}
-
 /** Record own voice via MediaRecorder; returns a stop() that resolves to the asset */
 export async function startRecording(): Promise<{ stop: () => Promise<Blob> }> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -111,11 +95,4 @@ export async function startRecording(): Promise<{ stop: () => Promise<Blob> }> {
       rec.stop()
     }),
   }
-}
-
-export async function saveVoiceRecording(text: TextItem, blob: Blob) {
-  const asset: Asset = { id: uid(), kind: 'voice', name: text.title, blob, mime: blob.type, durationSec: await measureDuration(blob), phases: text.phases, gainDb: 0, createdAt: new Date().toISOString() }
-  await db.assets.add(asset)
-  await db.texts.update(text.id, { voiceAssetId: asset.id, estSec: asset.durationSec || text.estSec })
-  return asset
 }

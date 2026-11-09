@@ -113,7 +113,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         {adv && (
           <div className="fade-in card rounded-2xl p-4 mt-3 flex flex-col gap-3 text-[15px]">
             {mode !== 'album' && (
-              <label className="flex items-center justify-between"><div><div>קריינות עברית</div><div className="text-[13px] opacity-75">טקסטים מהספרייה לפי שלב וכוונה</div></div><input type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} /></label>
+              <label className="flex items-center justify-between"><div><div>קריינות עברית</div><div className="text-[13px] opacity-75">קול מדריכה בעברית לפי שלב וכוונה</div></div><input type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} /></label>
             )}
             <label className="flex items-center justify-between"><div><div>הנחיית נשימה</div><div className="text-[13px] opacity-75">אורב, צלילים ורטט בשלבים 1, 2, 4</div></div><input type="checkbox" checked={breath} onChange={(e) => setBreath(e.target.checked)} /></label>
           </div>

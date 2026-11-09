@@ -49,6 +49,8 @@ export interface Cue {
   layer: Layer
   action: 'play' | 'stop' | 'pattern' | 'phase'
   asset?: string
+  /** built-in narration clip id (public/voice) */
+  clip?: string
   pattern?: BreathPattern
   phase?: Phase
   duck?: number
@@ -83,8 +85,6 @@ export interface JournalEntry {
 
 export interface Settings {
   id: 'main'
-  elevenKey?: string
-  voiceId?: string
   musicGain: number
   voiceGain: number
   breathGain: number

@@ -1,111 +1,59 @@
 import { useEffect, useRef, useState } from 'react'
-import { type Album, type Asset, type Phase, type Settings, type TextItem, db, getSettings, uid } from '../db'
-import { deleteAlbum, importAlbum, importMusic, saveVoiceRecording, startRecording, synthesizeVoice } from '../engine/library'
+import { type Album, type Asset, type Phase, type Settings, db, getSettings } from '../db'
+import { deleteAlbum, importAlbum, importMusic } from '../engine/library'
+import { VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceGroup, voiceUrl } from '../engine/voice'
 import { PHASE_NAMES } from '../engine/plan'
 import { checkForUpdate, versionLabel } from '../version'
 
-type Tab = 'texts' | 'music' | 'settings'
+type Tab = 'voice' | 'music' | 'settings'
 
 export function LibraryScreen() {
-  const [tab, setTab] = useState<Tab>('texts')
+  const [tab, setTab] = useState<Tab>('voice')
   return (
     <div className="fade-in flex flex-col gap-5 px-5 pt-10 pb-28">
       <h1 className="text-[34px] title-psy">ספרייה</h1>
       <div className="flex gap-1 p-1 rounded-full chip text-[15px]">
-        {(['texts', 'music', 'settings'] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-full transition-all ${tab === t ? 'btn-psy' : 'opacity-85'}`}>{{ texts: 'טקסטים', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
+        {(['voice', 'music', 'settings'] as Tab[]).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-full transition-all ${tab === t ? 'btn-psy' : 'opacity-85'}`}>{{ voice: 'קריינות', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
         ))}
       </div>
-      {tab === 'texts' && <Texts />}
+      {tab === 'voice' && <Narration />}
       {tab === 'music' && <Music />}
       {tab === 'settings' && <SettingsPane />}
     </div>
   )
 }
 
-/* ---------- Texts ---------- */
-function Texts() {
-  const [texts, setTexts] = useState<TextItem[]>([])
-  const [edit, setEdit] = useState<TextItem | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState('')
-  const reload = () => db.texts.toArray().then((t) => setTexts(t.sort((a, b) => a.phases[0] - b.phases[0] || a.createdAt.localeCompare(b.createdAt))))
-  useEffect(() => { void reload() }, [])
-
-  const synth = async (t: TextItem) => {
-    const s = await getSettings()
-    if (!s.elevenKey || !s.voiceId) { setMsg('הגדר מפתח ElevenLabs וקול בלשונית הגדרות'); return }
-    setBusy(t.id); setMsg('')
-    try { await synthesizeVoice(t, s.elevenKey, s.voiceId); await reload() } catch (e) { setMsg(String(e)) }
-    setBusy(null)
+/* ---------- Narration (built-in, read-only) ---------- */
+function Narration() {
+  const [playing, setPlaying] = useState<string | null>(null)
+  const audio = useRef<HTMLAudioElement | null>(null)
+  useEffect(() => () => { audio.current?.pause() }, [])
+  const toggle = (id: string) => {
+    audio.current?.pause()
+    if (playing === id) { setPlaying(null); return }
+    const a = new Audio(voiceUrl(id)); a.onended = () => setPlaying(null)
+    audio.current = a; void a.play().catch(() => setPlaying(null)); setPlaying(id)
   }
-  const synthAll = async () => { for (const t of texts.filter((x) => !x.voiceAssetId)) await synth(t) }
-
-  const play = async (t: TextItem) => {
-    if (!t.voiceAssetId) return
-    const a = await db.assets.get(t.voiceAssetId); if (!a) return
-    const url = URL.createObjectURL(a.blob); const au = new Audio(url); au.onended = () => URL.revokeObjectURL(url); void au.play()
-  }
-
-  const missing = texts.filter((t) => !t.voiceAssetId).length
+  const groups = (Object.keys(VOICE_GROUP_NAMES) as VoiceGroup[]).map((g) => ({ g, clips: VOICE_CLIPS.filter((c) => c.group === g) }))
+  const total = Math.round(VOICE_CLIPS.reduce((t, c) => t + c.dur, 0) / 60)
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-between items-center text-[14px] opacity-85">
-        <span>{texts.length} טקסטים · {missing} ללא קול</span>
-        <div className="flex gap-4">
-          {missing > 0 && <button onClick={synthAll} disabled={!!busy}>הפק קול לכולם</button>}
-          <button onClick={() => setEdit({ id: uid(), title: '', body: '', source: 'שלי', phases: [2], intentions: [], estSec: 20, createdAt: new Date().toISOString() })}>+ חדש</button>
-        </div>
-      </div>
-      {msg && <div className="text-[14px] text-amber-200/80">{msg}</div>}
-      {texts.map((t) => (
-        <div key={t.id} className="card rounded-2xl p-4">
-          <div className="flex justify-between">
-            <div className="text-[18px] font-semibold">{t.title}</div>
-            <div className="text-[14px] opacity-80">{t.phases.map((p) => PHASE_NAMES[p]).join(' · ')}</div>
-          </div>
-          <p className="text-[15px] opacity-80 leading-relaxed mt-2 line-clamp-2">{t.body}</p>
-          <div className="flex gap-4 text-[14px] mt-3 opacity-80">
-            {t.voiceAssetId ? <button onClick={() => play(t)}>▶ האזן</button> : <span className="opacity-85">אין קול</span>}
-            <button onClick={() => synth(t)} disabled={busy === t.id}>{busy === t.id ? 'מפיק…' : t.voiceAssetId ? 'הפק מחדש' : 'הפק קריינות'}</button>
-            <RecordButton text={t} onDone={reload} />
-            <button onClick={() => setEdit(t)}>ערוך</button>
-          </div>
-        </div>
+    <div className="flex flex-col gap-5">
+      <p className="text-[14px] muted leading-relaxed">{VOICE_CLIPS.length} קטעי קריינות בעברית · כ-{total} דקות · קול "המדריך". הם משולבים במסע לפי המצב, הכוונה והשלב, ועובדים גם בלי רשת.</p>
+      {groups.map(({ g, clips }) => (
+        <section key={g} className="flex flex-col gap-2">
+          <div className="label">{VOICE_GROUP_NAMES[g]}</div>
+          {clips.map((c) => (
+            <div key={c.id} className="card rounded-2xl p-4 flex gap-3 items-start">
+              <button onClick={() => toggle(c.id)} aria-label="האזן" className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-[14px] ${playing === c.id ? 'btn-psy' : 'btn-ghost'}`}>{playing === c.id ? '■' : '▶'}</button>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-baseline gap-2"><div className="text-[16px] font-medium">{c.title}</div><div className="text-[13px] muted tabular-nums">{Math.round(c.dur)} שנ'</div></div>
+                <p className={`text-[14px] muted leading-relaxed mt-1 ${playing === c.id ? '' : 'line-clamp-2'}`}>{c.text.replace(/([.,])\s*\.\.\./g, '$1').replace(/\.\.\./g, '…')}</p>
+              </div>
+            </div>
+          ))}
+        </section>
       ))}
-      {edit && <TextEditor item={edit} onClose={() => { setEdit(null); void reload() }} />}
-    </div>
-  )
-}
-
-function RecordButton({ text, onDone }: { text: TextItem; onDone: () => void }) {
-  const [rec, setRec] = useState<{ stop: () => Promise<Blob> } | null>(null)
-  const toggle = async () => {
-    if (rec) { const b = await rec.stop(); setRec(null); await saveVoiceRecording(text, b); onDone(); return }
-    try { setRec(await startRecording()) } catch { /* */ }
-  }
-  return <button onClick={toggle} className={rec ? 'text-red-300' : ''}>{rec ? '● עצור' : 'הקלט בעצמך'}</button>
-}
-
-function TextEditor({ item, onClose }: { item: TextItem; onClose: () => void }) {
-  const [t, setT] = useState(item)
-  const togglePhase = (p: Phase) => setT({ ...t, phases: t.phases.includes(p) ? t.phases.filter((x) => x !== p) : [...t.phases, p].sort() })
-  const save = async () => { await db.texts.put({ ...t, estSec: t.estSec || Math.round(t.body.length / 12) }); onClose() }
-  const del = async () => { if (confirm('למחוק את הטקסט?')) { await db.texts.delete(t.id); if (t.voiceAssetId) await db.assets.delete(t.voiceAssetId); onClose() } }
-  return (
-    <div className="fixed inset-0 bg-bg/95 z-50 flex flex-col gap-4 px-5 pt-12 pb-8 overflow-y-auto">
-      <input value={t.title} onChange={(e) => setT({ ...t, title: e.target.value })} placeholder="כותרת" className="bg-transparent border-b border-ink/15 py-2 text-[20px] outline-none" />
-      <textarea value={t.body} onChange={(e) => setT({ ...t, body: e.target.value })} placeholder="הטקסט, כפי שייאמר…" rows={8} className="bg-transparent border border-ink/12 rounded-xl p-3 text-[17px] leading-relaxed outline-none resize-none" />
-      <div className="text-[14px] opacity-80">שלבים</div>
-      <div className="flex flex-wrap gap-2">
-        {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => togglePhase(p)} className={`px-3 py-1.5 rounded-full border text-[14px] ${t.phases.includes(p) ? 'chip-on' : 'chip'}`}>{PHASE_NAMES[p]}</button>)}
-      </div>
-      <input value={t.intentions.join(', ')} onChange={(e) => setT({ ...t, intentions: e.target.value.split(/[,\s]+/).filter(Boolean) })} placeholder="כוונות (שקט, ריפוי…)" className="bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none" />
-      <input value={t.source} onChange={(e) => setT({ ...t, source: e.target.value })} placeholder="מקור" className="bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none" />
-      <div className="mt-auto flex flex-col gap-3">
-        <button onClick={save} className="rounded-2xl py-4 bg-ink text-bg text-[17px]">שמור</button>
-        <div className="flex justify-between text-[15px] opacity-85"><button onClick={onClose}>ביטול</button><button onClick={del}>מחק</button></div>
-      </div>
     </div>
   )
 }
@@ -180,32 +128,11 @@ function GainSlider({ label, value, onChange }: { label: string; value: number; 
 
 function SettingsPane() {
   const [s, setS] = useState<Settings | null>(null)
-  const [voices, setVoices] = useState<Array<{ voice_id: string; name: string }>>([])
   useEffect(() => { void getSettings().then(setS) }, [])
   if (!s) return null
   const save = (patch: Partial<Settings>) => { const n = { ...s, ...patch }; setS(n); void db.settings.put(n) }
-  const loadVoices = async () => {
-    if (!s.elevenKey) return
-    const r = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': s.elevenKey } })
-    if (r.ok) setVoices((await r.json()).voices)
-  }
   return (
     <div className="flex flex-col gap-6 text-[15px]">
-      <section className="flex flex-col gap-3">
-        <div className="text-[18px] font-semibold">קול (ElevenLabs)</div>
-        <input type="password" value={s.elevenKey ?? ''} onChange={(e) => save({ elevenKey: e.target.value })} placeholder="מפתח API" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
-        <div className="flex gap-3 items-center">
-          <input value={s.voiceId ?? ''} onChange={(e) => save({ voiceId: e.target.value })} placeholder="Voice ID" className="flex-1 bg-transparent border-b border-ink/15 py-2 outline-none" />
-          <button onClick={loadVoices} className="text-[14px] opacity-85">טען קולות</button>
-        </div>
-        {voices.length > 0 && (
-          <select value={s.voiceId ?? ''} onChange={(e) => save({ voiceId: e.target.value })} className="bg-bg border border-ink/15 rounded-lg p-2">
-            <option value="">בחר קול</option>
-            {voices.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}</option>)}
-          </select>
-        )}
-        <p className="text-[14px] opacity-80">המפתח נשמר רק במכשיר הזה. הפקת קול דורשת רשת; המסע עצמו לא.</p>
-      </section>
       <section className="flex flex-col gap-3">
         <div className="text-[18px] font-semibold">פלט</div>
         <div className="grid grid-cols-2 gap-2">
