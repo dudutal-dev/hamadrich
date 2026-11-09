@@ -17,22 +17,26 @@ interface Props {
 
 /** script label → clips (keyword based so new evenings work too; the more specific rules first) */
 const RULES: [RegExp | string, string[]][] = [
-  [/שלכם/, ['dance', 'hug']],
-  [/מגע משותף/, ['dance', 'she-touch']],
-  [/חיבוק|להאט/, ['hug']],
-  [/מוביל|ריקוד/, ['dance']],
-  [/היא נוגעת/, ['she-touch', 'him-receives-b']],
+  [/שלכם/, ['mutual', 'merge']],
+  [/מגע משותף/, ['mutual', 'dance']],
+  [/חיבוק/, ['hug']],
+  [/להאט/, ['mutual', 'hug']],
+  [/מוביל/, ['dance-lead', 'dance']],
+  [/ריקוד/, ['dance', 'dance-lead']],
+  [/היא נוגעת/, ['she-touch', 'she-touch-face']],
   [/הוא נוגע/, ['he-touch-hair']],
-  [/היא מקבלת|הוא נותן/, ['he-touch-hair', 'heart-her']],
-  [/הוא מקבל|היא נותנת/, ['him-receives-b', 'she-touch']],
-  [/יד על הלב/, ['heart-her']],
+  [/היא מקבלת|הוא נותן/, ['her-receives-b', 'he-touch-hair']],
+  [/הוא מקבל|היא נותנת/, ['him-receives-a', 'him-receives-b']],
+  [/הוא · יד על הלב/, ['heart-him']],
+  [/היא · יד על הלב/, ['heart-her']],
   [/שתיקה/, ['silence']],
   [/נשימה/, ['breath']],
-  [/מבט|מול|בדיקה|טקס/, ['gaze']],
-  [/להתרחב/, ['she-touch', 'he-touch-hair']],
+  [/מבט|מול|בדיקה/, ['gaze']],
+  [/להתרחב/, ['she-touch-face', 'he-touch-hair']],
   [/הוא מדבר/, ['speak-him']],
   [/היא מדברת/, ['speak-her']],
   [/שיתוף/, ['sit-open', 'hug']],
+  [/טקס/, ['ritual']],
   [/החלפה|מילת עצירה|יותר|פתיחה/, ['sit-open']],
   ['שניכם', ['hug']], // closing moment of an evening
 ]
@@ -101,13 +105,14 @@ export function CoupleFigures({ label, paused, mode, size, levels }: Props) {
 
   // soft edges so the video melts into the cosmos (black background of the clips ≈ the night sky)
   const mask = mode === 'fill'
-    ? 'radial-gradient(ellipse 75% 80% at 50% 50%, #000 62%, transparent 100%)'
+    ? 'linear-gradient(to right, transparent, #000 20%, #000 80%, transparent)'
     : 'radial-gradient(ellipse 62% 56% at 50% 50%, #000 70%, transparent 100%)'
   // landscape: 'contain' never crops heads; portrait: 'cover' crops the empty sides
   return (
     <video ref={ref} muted playsInline preload="auto" disablePictureInPicture aria-hidden
       style={{ display: 'block', objectFit: mode === 'fill' ? 'contain' : 'cover', opacity: 0, transition: `opacity ${OUT}ms ease`,
-        ...(mode === 'fill' ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { width: size?.w, height: size?.h }),
+        // fill: the element is exactly the 16:9 picture (centred), so the soft mask fades the picture's own edges into the sky
+        ...(mode === 'fill' ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(100vw, 177.78vh)', height: 'min(100vh, 56.25vw)' } : { width: size?.w, height: size?.h }),
         WebkitMaskImage: mask, maskImage: mask, pointerEvents: 'none' }} />
   )
 }
