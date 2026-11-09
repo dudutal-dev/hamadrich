@@ -6,6 +6,7 @@ import { Cosmos } from './Cosmos'
 import { Orb } from './Orb'
 import { CastSheet } from './CastSheet'
 import { CoupleFigures } from './CoupleFigures'
+import { AlbumVisuals, pickVisual } from './AlbumVisuals'
 import { bodyJourney } from '../engine/body'
 import { g, useAddress } from '../address'
 
@@ -35,6 +36,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const endedRef = useRef(false)
   const isAlbum = engine.plan.mode === 'album'
   const isCouple = bodyJourney(engine.plan.journey)?.level === 3
+  // Psychedelic Prayers: the built-in visual journey fills the screen (only for the known recording of each track)
+  const visual = engine.plan.visuals === 'prayers' ? pickVisual(s.albumTrack, s.t - s.trackStart, s.trackDur) : null
   const a = useAddress()
 
   useEffect(() => { const off = engine.on(setS); return () => { off() } }, [engine])
@@ -47,10 +50,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   }, [awake])
   useEffect(() => {
     // TV mode keeps the screen on all the way (it is being watched / mirrored); otherwise the peak lets it sleep
-    const want = (tv || s.phase !== 3) && 'wakeLock' in navigator
+    const want = (tv || s.phase !== 3 || !!visual) && 'wakeLock' in navigator
     if (want && !wakeLock.current) navigator.wakeLock.request('screen').then((l) => { wakeLock.current = l }).catch(() => {})
     if (!want && wakeLock.current) { void wakeLock.current.release(); wakeLock.current = null }
-  }, [s.phase, tv])
+  }, [s.phase, tv, !!visual]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { void wakeLock.current?.release() }, [])
   useEffect(() => {
     if (s.done && !endedRef.current) { endedRef.current = true; setTimeout(() => onEnd(Math.round(s.t), true), 2500) }
@@ -70,7 +73,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     const held = Date.now() - pressStart.current; pressStart.current = 0
     const dy = touchY.current - e.clientY
     if (emergency || confirmExit) return
-    const cleanable = isCouple && vp.w > vp.h && Math.abs(dy) < 90 && held < 700
+    const cleanable = ((isCouple && vp.w > vp.h) || !!visual) && Math.abs(dy) < 90 && held < 700
     if (cleanable && clean) { setClean(false); return }
     if (wasAsleep.current && held < 700 && Math.abs(dy) < 90) { wasAsleep.current = false; return }
     if (dy > 90) { engine.skipToReturn(); flash('מדלג לחזרה'); return }
@@ -115,6 +118,12 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
       className="h-full relative flex flex-col items-center select-none touch-none overflow-hidden" style={{ background: '#070510' }}>
       <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} levels={() => engine.levels()} focus={orbCenter} />
+      {visual && <>
+        <AlbumVisuals pick={visual} paused={s.paused} levels={() => engine.levels()} />
+        {/* soft shades keep the captions and the player readable over the scene */}
+        <div className="absolute inset-x-0 top-0 h-[22%] pointer-events-none" style={{ opacity: clean ? 0 : 1, transition: 'opacity 600ms', background: 'linear-gradient(to bottom, rgba(7,5,16,0.7), transparent)' }} />
+        <div className="absolute inset-x-0 bottom-0 h-[42%] pointer-events-none" style={{ opacity: clean ? 0 : 1, transition: 'opacity 600ms', background: 'linear-gradient(to top, rgba(7,5,16,0.85), transparent)' }} />
+      </>}
       {isCouple && landscape && <>
         {/* landscape / TV: the couple fills the screen; a soft shade at the bottom keeps the turn label readable */}
         <CoupleFigures mode="fill" label={s.label} paused={s.paused} levels={() => engine.levels()} />
@@ -140,6 +149,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       <div className={`relative flex-1 flex ${tv && landscape && !isCouple ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${isCouple && landscape ? 'justify-end pb-[calc(env(safe-area-inset-bottom)+12px)]' : tv ? 'justify-center' : isCouple ? 'justify-start pt-2' : 'justify-start pt-6'}`}>
         <div ref={orbRef}>{isCouple
           ? (landscape ? null : <CoupleFigures mode="box" label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: vp.w, h: Math.round(Math.min(vp.h * (tv ? 0.62 : 0.56), vp.w * 1.25)) }} />)
+          : visual ? null
           : <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} />}</div>
         <div className={`${isCouple ? (landscape ? '' : 'mt-3') : tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll || clean ? 0 : 1, transition: `opacity ${clean ? 600 : 1200}ms` }}>
           {s.label && <div key={s.label} className="fade-in text-[clamp(20px,4.5vmin,44px)] font-semibold mb-3 text-center px-4" style={{ color: color2, textShadow: `0 0 24px ${color}` }}>{s.label}</div>}

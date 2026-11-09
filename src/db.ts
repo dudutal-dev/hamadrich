@@ -60,6 +60,10 @@ export interface Cue {
   duck?: number
   /** on-screen instruction (couple evenings: whose turn it is) */
   label?: string
+  /** album track number of a music cue (album mode) */
+  albumTrack?: number
+  /** that track's length in seconds (fingerprint for built-in visuals) */
+  trackDur?: number
 }
 
 export interface SessionPlan {
@@ -74,6 +78,8 @@ export interface SessionPlan {
   address?: 'm' | 'f'
   /** body & sexuality journey id (mode 'body') */
   journey?: string
+  /** built-in visual journey for a known album */
+  visuals?: 'prayers'
   createdAt: string
 }
 
