@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { type Album, type Asset, type Phase, type Settings, db, getSettings } from '../db'
 import { deleteAlbum, importAlbum, importMusic } from '../engine/library'
-import { BODY_CLIPS, VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceClip, type VoiceGroup, clipText, voiceUrl } from '../engine/voice'
-import { BODY_JOURNEYS, isAdultUnlocked } from '../engine/body'
+import { BODY_CLIPS, COUPLE_CLIPS, VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceClip, type VoiceGroup, clipText, voiceUrl } from '../engine/voice'
+import { BODY_JOURNEYS, isAdultUnlocked, isCoupleUnlocked } from '../engine/body'
 import { g, useAddress } from '../address'
 import { AddressPicker } from './AddressPicker'
 import { PHASE_NAMES } from '../engine/plan'
@@ -41,7 +41,10 @@ function Narration() {
   }
   const groups: { key: string; label: string; clips: VoiceClip[] }[] = (Object.keys(VOICE_GROUP_NAMES) as VoiceGroup[]).filter((g) => g !== 'body').map((g) => ({ key: g, label: VOICE_GROUP_NAMES[g], clips: VOICE_CLIPS.filter((c) => c.group === g) }))
   // body & sexuality journeys (level 2 only after the 18+ confirmation); clips for the other gender are hidden
-  for (const j of BODY_JOURNEYS) if (j.level === 1 || isAdultUnlocked()) groups.push({ key: j.id, label: `גוף ומיניות · ${j.title}`, clips: BODY_CLIPS.filter((c) => c.journey === j.id && (!c.only || c.only === a)) })
+  for (const j of BODY_JOURNEYS) {
+    if (j.level === 3) { if (isCoupleUnlocked()) groups.push({ key: j.id, label: `ערב זוגי · ${j.title}`, clips: COUPLE_CLIPS.filter((c) => c.journey === j.id) }); continue }
+    if (j.level === 1 || isAdultUnlocked()) groups.push({ key: j.id, label: `גוף ומיניות · ${j.title}`, clips: BODY_CLIPS.filter((c) => c.journey === j.id && (!c.only || c.only === a)) })
+  }
   const total = Math.round(VOICE_CLIPS.reduce((t, c) => t + c.dur, 0) / 60)
   return (
     <div className="flex flex-col gap-5">

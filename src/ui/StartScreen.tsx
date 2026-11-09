@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type Album, type Mode, type Phase, db } from '../db'
 import { Halo } from './Halo'
-import { BODY_JOURNEYS, type BodyJourney, bodyJourney, isAdultUnlocked, unlockAdult } from '../engine/body'
+import { BODY_JOURNEYS, type BodyJourney, bodyJourney, isAdultUnlocked, isCoupleUnlocked, unlockAdult, unlockCouple } from '../engine/body'
 import { g, hasChosenAddress, useAddress } from '../address'
 import { AddressPicker } from './AddressPicker'
 import { INTENTIONS, INTENTION_META, MODE_LONG, MODE_META, PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
@@ -24,6 +24,8 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [journey, setJourney] = useState<string | null>(null)
   const [adult, setAdult] = useState(isAdultUnlocked)
   const [gate, setGate] = useState(false)
+  const [couple, setCouple] = useState(isCoupleUnlocked)
+  const [gate2, setGate2] = useState(false)
   const [minutes, setMinutes] = useState(MODE_META.breath.defaultMin)
   const [intention, setIntention] = useState('שקט')
   const [custom, setCustom] = useState('')
@@ -113,6 +115,20 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
           )}
       </section>
 
+      <section className="flex flex-col gap-3">
+        <div className="label">ערב זוגי · 18+</div>
+        <p className="text-[14px] muted leading-relaxed px-1 -mt-1">ערבים לשני בני זוג יחד. ההנחיה פונה לשניכם, ופעם אליו ופעם אליה, ועל המסך כתוב של מי התור. מומלץ עם רמקול ומצב טלוויזיה.</p>
+        {couple
+          ? BODY_JOURNEYS.filter((j) => j.level === 3).map((j) => <BodyCard key={j.id} j={j} on={mode === 'body' && journey === j.id} onPick={() => pickBody(j)} />)
+          : (
+            <button onClick={() => setGate2(true)} className="card rounded-3xl p-5 text-right flex items-center gap-4">
+              <span className="text-[26px]">🔒</span>
+              <span className="flex-1"><span className="block text-[17px] font-semibold">שלושה ערבים זוגיים</span><span className="block text-[14px] muted mt-0.5">נשימה משותפת · מגע שמקשיב · ערב של תשוקה</span></span>
+              <span className="text-[14px] font-medium">פתיחה</span>
+            </button>
+          )}
+      </section>
+
       <section className="card rounded-3xl p-5">
         <div className="flex justify-between items-baseline mb-3">
           <div className="label">משך</div>
@@ -171,6 +187,20 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
             <p className="text-[14px] muted leading-relaxed">בכל שלב יש הזמנה ולא הוראה. מותר לעצור בכל רגע. {g(a, 'אם עולים זיכרונות קשים – עצור, ושקול ליווי מקצועי.', 'אם עולים זיכרונות קשים – עצרי, ושקלי ליווי מקצועי.')}</p>
             <button onClick={() => { unlockAdult(); setAdult(true); setGate(false) }} className="btn-psy rounded-2xl py-4 text-[16px]">{g(a, 'אני מעל 18 ונמצא במקום פרטי', 'אני מעל 18 ונמצאת במקום פרטי')}</button>
             <button onClick={() => setGate(false)} className="text-[15px] muted py-2">לא עכשיו</button>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {gate2 && createPortal(
+        <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={() => setGate2(false)}>
+          <div className="fade-in sheet w-full rounded-t-[32px] p-6 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-ink/30 self-center -mt-2" />
+            <h2 className="text-[24px] font-semibold">ערב זוגי</h2>
+            <p className="text-[15px] leading-relaxed">ערבים של קרבה, מגע ותשוקה לשני בני זוג. ההנחיה עוצרת לפני מין עצמו ומשאירה אתכם עם המוזיקה.</p>
+            <p className="text-[14px] muted leading-relaxed">בכל ערב בוחרים מילת עצירה, ויש בדיקות "זה עדיין טוב?". אין חובה להגיע לשום מקום. כל אחד מכם יכול לעצור בכל רגע, בלי הסברים.</p>
+            <button onClick={() => { unlockCouple(); setCouple(true); setGate2(false) }} className="btn-psy rounded-2xl py-4 text-[16px]">שנינו מעל 18, בהסכמה, במקום פרטי</button>
+            <button onClick={() => setGate2(false)} className="text-[15px] muted py-2">לא עכשיו</button>
           </div>
         </div>,
         document.body,

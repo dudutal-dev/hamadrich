@@ -1,6 +1,6 @@
 import { breathWindowsFor } from './albumBreath'
 import { type Address, BODY_CLIPS, VOICE_CLIPS, clipDur } from './voice'
-import { BODY_JOURNEYS, bodyJourney } from './body'
+import { BODY_JOURNEYS, type BodyJourney, bodyJourney } from './body'
 import { type Album, type Asset, type BreathPattern, type Cue, type Mode, type Phase, type PhaseSpan, type SessionPlan, uid } from '../db'
 
 export const PHASE_NAMES: Record<Phase, string> = {
@@ -196,6 +196,7 @@ export function buildPlan(input: BuildInput): SessionPlan {
 /** Body & sexuality journey: its own clips in order per phase, breath after the explanation, silent peak with sparse anchors */
 function buildBodyPlan(input: BuildInput): SessionPlan {
   const j = bodyJourney(input.journey) ?? BODY_JOURNEYS[0]
+  if (j.steps) return buildCouplePlan(input, j)
   address = input.address ?? 'm'
   const durationSec = input.durationSec
   const phases = buildPhases('body', durationSec)
@@ -249,6 +250,38 @@ function buildBodyPlan(input: BuildInput): SessionPlan {
     }
   }
   if (input.voiceEnabled) for (const v of voice) if (v.t < durationSec) cues.push({ t: v.t, layer: 'voice', action: 'play', clip: v.id, duck: -8 })
+  cues = clearBreathUnderVoice(cues)
+  return { id: uid(), mode: 'body', intention: j.title, durationSec, phases, cues, address, journey: j.id, createdAt: new Date().toISOString() }
+}
+
+/** Couple evening (level 3): fixed sequence of steps; the music time after each step stretches with the chosen length */
+function buildCouplePlan(input: BuildInput, j: BodyJourney): SessionPlan {
+  address = 'm' // single version, addressed to both / him / her inside the text
+  const steps = j.steps ?? []
+  const lead = 6, pad = 3
+  const speech = steps.reduce((t, st) => t + dur(st.clip) + pad, lead)
+  const free = Math.max(steps.length * 20, input.durationSec - speech)
+  const W = steps.reduce((t, st) => t + st.w, 0)
+  let cues: Cue[] = []
+  const phases: PhaseSpan[] = []
+  let t = lead
+  cues.push({ t: 0, layer: 'breath', action: 'pattern', pattern: 'none' })
+  for (const st of steps) {
+    if (phases[phases.length - 1]?.n !== st.phase) {
+      if (phases.length) phases[phases.length - 1].endSec = t - 1
+      phases.push({ n: st.phase, startSec: phases.length ? t - 1 : 0, endSec: t })
+      cues.push({ t: phases[phases.length - 1].startSec, layer: 'visual', action: 'phase', phase: st.phase })
+      cues.push({ t: phases[phases.length - 1].startSec, layer: 'music', action: 'play' })
+    }
+    cues.push({ t, layer: 'visual', action: 'label', label: st.label })
+    if (input.voiceEnabled) cues.push({ t, layer: 'voice', action: 'play', clip: st.clip, duck: -8 })
+    const end = t + dur(st.clip)
+    cues.push({ t: t - 0.5, layer: 'breath', action: 'pattern', pattern: 'none' })
+    if (st.breath && input.breathEnabled) cues.push({ t: end + 1.5, layer: 'breath', action: 'pattern', pattern: st.breath })
+    t = end + pad + (free * st.w) / W
+  }
+  const durationSec = Math.round(t)
+  if (phases.length) phases[phases.length - 1].endSec = durationSec
   cues = clearBreathUnderVoice(cues)
   return { id: uid(), mode: 'body', intention: j.title, durationSec, phases, cues, address, journey: j.id, createdAt: new Date().toISOString() }
 }
