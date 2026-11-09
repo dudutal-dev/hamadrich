@@ -26,7 +26,7 @@ export default defineConfig({
         lang: 'he',
         dir: 'rtl',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'any',
         background_color: '#0C0A17',
         theme_color: '#0C0A17',
         start_url: './',
