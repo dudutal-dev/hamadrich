@@ -91,7 +91,7 @@ export default function App() {
         </div>
       )}
       <nav className="fixed z-20 bottom-0 right-0 left-0 flex justify-around items-center pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]" style={{ background: 'rgba(12,10,23,0.82)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderTop: '1px solid rgba(246,242,234,0.08)' }}>
-        {([['journey', 'מסע'], ['album', 'האלבום'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => {
+        {([['journey', 'מסע'], ['album', 'אלבומים'], ['journal', 'יומן'], ['library', 'ספרייה']] as [Tab, string][]).map(([k, l]) => {
           const on = tab === k
           return (
             <button key={k} onClick={() => setTab(k)} className="flex flex-col items-center gap-1 px-3 py-1 transition-all duration-300" style={{ opacity: on ? 1 : 0.72 }}>

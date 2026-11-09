@@ -1,5 +1,6 @@
 import { type Album, type Asset, type Phase, db, uid } from '../db'
-import { defaultAlbumPhaseMap } from './plan'
+import { defaultAlbumPhaseMap, isPsychedelicPrayers } from './plan'
+import { analyzeSpeech } from './speech'
 import JSZip from 'jszip'
 
 /** Measure audio duration via a media element (metadata only, no full decode) */
@@ -53,19 +54,32 @@ export async function importAlbum(files: File[], name: string, onProgress?: (msg
   const expanded = await expandZips(files, onProgress)
   const sorted = [...expanded].sort((a, b) => trackNoOf(a.name) - trackNoOf(b.name) || a.name.localeCompare(b.name))
   const albumId = uid()
-  const phaseMap = defaultAlbumPhaseMap(sorted.length)
+  const durs: number[] = []
+  for (const [k, f] of sorted.entries()) { onProgress?.(`קורא ${k + 1}/${sorted.length}…`); durs.push(await measureDuration(f)) }
+  const phaseMap = defaultAlbumPhaseMap(sorted.length, durs)
   let total = 0
   let i = 1
   for (const f of sorted) {
     onProgress?.(`מייבא ${i}/${sorted.length}…`)
-    const dur = await measureDuration(f)
+    const dur = durs[i - 1]
     total += dur
     await db.assets.add({ id: uid(), kind: 'music', name: cleanName(f.name), blob: f, mime: f.type || 'audio/mpeg', durationSec: dur, phases: [phaseMap[i]], gainDb: 0, albumId, trackNo: i, createdAt: new Date().toISOString() })
     i++
   }
   const album: Album = { id: albumId, name, trackCount: sorted.length, totalSec: total, phaseMap, createdAt: new Date().toISOString() }
   await db.albums.add(album)
+  // Psychedelic Prayers ships with a hand-made breath map; any other album gets automatic speech detection
+  if (!isPsychedelicPrayers(album)) await analyzeAlbumBreath(album.id, onProgress)
   return album
+}
+
+/** detect narration in every track of an album and store the instrumental windows used for breath guidance */
+export async function analyzeAlbumBreath(albumId: string, onProgress?: (msg: string) => void) {
+  const tracks = (await db.assets.where('albumId').equals(albumId).toArray()).sort((a, b) => (a.trackNo ?? 0) - (b.trackNo ?? 0))
+  for (const [k, t] of tracks.entries()) {
+    onProgress?.(`מזהה קטעי דיבור ${k + 1}/${tracks.length}…`)
+    try { await db.assets.update(t.id, { breathWindows: (await analyzeSpeech(t.blob)).windows }) } catch { await db.assets.update(t.id, { breathWindows: [] }) }
+  }
 }
 
 function trackNoOf(name: string): number {
