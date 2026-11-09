@@ -31,6 +31,11 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [startedAt, setStartedAt] = useState('')
   const [updatedTo, setUpdatedTo] = useState(justUpdated)
+  const [updating, setUpdating] = useState<'downloading' | 'failed' | null>(null)
+  useEffect(() => {
+    const on = (e: Event) => { const d = (e as CustomEvent).detail as string; setUpdating(d === 'downloading' ? 'downloading' : d === 'failed' ? 'failed' : null) }
+    window.addEventListener('hamadrich:update', on); return () => window.removeEventListener('hamadrich:update', on)
+  }, [])
   useEffect(() => { if (!updatedTo) return; const id = setTimeout(() => setUpdatedTo(null), 4500); return () => clearTimeout(id) }, [updatedTo])
 
   useEffect(() => { void getSettings().then(setSettings) }, [])
@@ -84,6 +89,14 @@ export default function App() {
         {tab === 'journal' && <JournalScreen />}
         {tab === 'library' && <LibraryScreen />}
       </div>
+      {updating && !updatedTo && (
+        <div className="fade-in fixed z-30 top-[calc(env(safe-area-inset-top)+12px)] right-4 left-4 flex justify-center pointer-events-none">
+          <div className="sheet rounded-full px-5 py-2.5 text-[14px] font-medium flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full aura" style={{ background: updating === 'failed' ? '#E39470' : 'var(--grad)' }} />
+            {updating === 'failed' ? 'ההורדה נקטעה – פתחו שוב את האפליקציה' : 'מוריד עדכון… השאירו את האפליקציה פתוחה'}
+          </div>
+        </div>
+      )}
       {updatedTo && (
         <div className="fade-in fixed z-30 top-[calc(env(safe-area-inset-top)+12px)] right-4 left-4 flex justify-center pointer-events-none">
           <div className="sheet rounded-full px-5 py-2.5 text-[15px] font-medium flex items-center gap-2 shadow-[0_10px_30px_-12px_rgba(242,194,107,0.7)]">
