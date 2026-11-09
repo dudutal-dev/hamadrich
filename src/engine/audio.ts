@@ -378,7 +378,7 @@ export class SessionEngine {
     music.forEach((a?: Asset) => { if (a) { this.blobs.set(a.id, a.blob); this.names.set(a.id, a.name) } })
     // phases that will use the built-in drone → pre-render to looping files (background-safe)
     const dronePhases = new Set<Phase>()
-    for (const c of this.plan.cues) if (c.layer === 'music' && c.action === 'play' && !c.asset) dronePhases.add(this.plan.phases.find((p) => c.t >= p.startSec && c.t < p.endSec)?.n ?? 3)
+    for (const c of this.plan.cues) if (c.layer === 'music' && c.action === 'play' && !c.asset && !c.track) dronePhases.add(this.plan.phases.find((p) => c.t >= p.startSec && c.t < p.endSec)?.n ?? 3)
     const order = [...dronePhases].sort((a, b) => a - b)
     const first = order.find((ph) => this.plan.phases[0]?.n === ph) ?? order[0]
     if (first !== undefined) { try { await renderDroneBlob(first, this.output, this.binaural) } catch (e) { console.warn('drone render failed', e) } }
