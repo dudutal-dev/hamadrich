@@ -2,10 +2,15 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,5 +27,19 @@ jobs:
     runs-on: ubuntu-latest
     environment: { name: github-pages, url: "${{ steps.deployment.outputs.page_url }}" }
     steps:
+      # If Pages is also set to "deploy from a branch", GitHub runs its own "pages build and deployment"
+      # on every push and publishes the raw repo (no build, no sw.js) – whichever finishes last wins.
+      # Wait for that run to finish so the built app is always published last.
+      - name: Wait for branch-based Pages build (if any)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          for i in $(seq 1 60); do
+            s=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=${{ github.sha }}&per_page=20" \
+                --jq '[.workflow_runs[] | select(.name == "pages build and deployment")][0].status // "none"' || echo error)
+            echo "branch-based Pages build: $s"
+            if [ "$s" = "completed" ]; then sleep 10; break; fi
+            if [ "$s" = "none" ] && [ "$i" -gt 6 ]; then break; fi
+            sleep 10
+          done
       - id: deployment
         uses: actions/deploy-pages@v4
