@@ -13,6 +13,8 @@ export default defineConfig({
   define: {
     // built-in media (voice, breath, music, couple illustrations) – downloaded after install, file by file, into a permanent cache
     __MEDIA__: JSON.stringify(['voice', 'breath', 'music', 'couple'].flatMap((d) => readdirSync(`public/${d}`).filter((f) => /\.(mp3|mp4)$/.test(f)).map((f) => `${d}/${f}`))),
+    // the Psychedelic Prayers visual journey – downloaded only when that album is in the library
+    __JOURNEY__: JSON.stringify(readdirSync('public/journey').filter((f) => f.endsWith('.mp4')).map((f) => `journey/${f}`)),
     __APP_VERSION__: JSON.stringify(sha),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
@@ -44,7 +46,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         cleanupOutdatedCaches: true,
         runtimeCaching: [{
-          urlPattern: /\/(voice|breath|music|couple)\/[^/]+\.(mp3|mp4)$/,
+          urlPattern: /\/(voice|breath|music|couple|journey)\/[^/]+\.(mp3|mp4)$/,
           handler: 'CacheFirst',
           options: { cacheName: 'hamadrich-media', rangeRequests: true, cacheableResponse: { statuses: [0, 200] } },
         }],

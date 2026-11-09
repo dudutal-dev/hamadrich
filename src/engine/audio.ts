@@ -38,6 +38,10 @@ export interface EngineState {
   durationSec: number
   trackName: string
   trackNo: number
+  /** album track number of the current track, its length, and the session time it started (album mode) */
+  albumTrack: number
+  trackDur: number
+  trackStart: number
   trackCount: number
   musicGain: number
   /** on-screen instruction (couple evenings) */
@@ -294,7 +298,7 @@ export class SessionEngine {
 
   constructor(public plan: SessionPlan) {
     this.musicCues = plan.cues.filter((c) => c.layer === 'music' && c.asset)
-    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: this.musicCues.length, musicGain: 0.8, label: '' }
+    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, albumTrack: 0, trackDur: 0, trackStart: 0, trackCount: this.musicCues.length, musicGain: 0.8, label: '' }
   }
 
   private now() { return Date.now() / 1000 }
@@ -506,6 +510,7 @@ export class SessionEngine {
     if (!c.asset) { this.state.trackName = ''; return }
     this.state.trackName = this.names.get(c.asset) ?? ''
     this.state.trackNo = this.musicCues.indexOf(c) + 1
+    this.state.albumTrack = c.albumTrack ?? 0; this.state.trackDur = c.trackDur ?? 0; this.state.trackStart = this.elapsed
     if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.title = this.state.trackName || 'המדריך'
   }
 

@@ -342,7 +342,7 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
       cues.push({ t, layer: 'breath', action: 'pattern', pattern: 'none' })
       curPhase = p
     }
-    cues.push({ t, layer: 'music', action: 'play', asset: tr.id })
+    cues.push({ t, layer: 'music', action: 'play', asset: tr.id, albumTrack: tr.trackNo, trackDur: tr.durationSec })
     // synced breath: only inside this track's instrumental windows (no narration), pattern by phase; never in the peak
     if (input.breathEnabled && p !== 3) {
       const wins = tr.breathWindows ?? breathWindowsFor(tr.trackNo, tr.durationSec) ?? []
@@ -356,11 +356,12 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
     t += tr.durationSec
   }
   if (phases.length) phases[phases.length - 1].endSec = t
-  return { id: uid(), mode: 'album', intention: input.intention, durationSec: Math.round(t), phases, cues, albumId: album.id, createdAt: new Date().toISOString() }
+  return { id: uid(), mode: 'album', intention: input.intention, durationSec: Math.round(t), phases, cues, albumId: album.id, ...(isPsychedelicPrayers(album) ? { visuals: 'prayers' as const } : {}), createdAt: new Date().toISOString() }
 }
 
 /** the Psychedelic Prayers album (55 tracks): has its own phase map, breath map and texts */
-export const isPsychedelicPrayers = (a: Pick<Album, 'name' | 'trackCount'>) => a.trackCount === 55 && /psychedelic\s*prayers|תפילות/i.test(a.name)
+export const isPsychedelicPrayers = (a: Pick<Album, 'name' | 'trackCount'> & { totalSec?: number }) =>
+  a.trackCount === 55 && (/psychedelic\s*prayers|תפילות/i.test(a.name) || Math.abs((a.totalSec ?? 0) - 5638) < 20) // by name, or by its exact length (any file name)
 
 /** default phase map: Psychedelic Prayers' known chapters, otherwise split by cumulative listening time (deep-journey shares) */
 export function defaultAlbumPhaseMap(trackCount: number, durations?: number[]): Record<number, Phase> {

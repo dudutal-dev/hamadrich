@@ -4,3 +4,4 @@
 declare const __APP_VERSION__: string
 declare const __BUILD_TIME__: string
 declare const __MEDIA__: string[]
+declare const __JOURNEY__: string[]
