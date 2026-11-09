@@ -80,7 +80,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
         {settings.emergencyPhone && (
           <a href={`tel:${settings.emergencyPhone}`} className="w-full rounded-2xl py-5 text-[18px] border border-ink/40 block">התקשר ל{settings.emergencyName ? `-${settings.emergencyName}` : ''}</a>
         )}
-        <button onClick={exit} className="mt-6 text-[15px] opacity-70">סיים עכשיו</button>
+        <button onClick={exit} className="mt-6 text-[15px] opacity-80">סיים עכשיו</button>
       </div>
     )
   }
@@ -92,12 +92,12 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
 
       {/* top bar */}
       <div className="relative w-full flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={ui}>
-        <button onClick={() => setConfirmExit(true)} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/40 backdrop-blur text-[20px] leading-none">✕</button>
+        <button onClick={() => setConfirmExit(true)} className="w-12 h-12 rounded-full btn-ghost bg-bg/40 backdrop-blur text-[20px] leading-none">✕</button>
         <div className="text-center">
-          <div className="text-[13px] tracking-[0.3em]" style={{ color: color2, textShadow: `0 0 12px ${color2}` }}>{s.phaseName}</div>
-          <div className="text-[12px] opacity-60 mt-0.5">{engine.plan.intention}</div>
+          <div className="text-[16px] font-semibold tracking-[0.12em]" style={{ color: color2, textShadow: `0 0 12px ${color2}` }}>{s.phaseName}</div>
+          <div className="text-[13px] opacity-75 mt-0.5">{engine.plan.intention}</div>
         </div>
-        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full border border-ink/30 bg-bg/40 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
+        <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full btn-ghost bg-bg/40 backdrop-blur text-[16px] leading-none">{s.paused ? '▶' : '❚❚'}</button>
       </div>
 
       {/* center */}
@@ -106,11 +106,11 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
         <div className="h-20 mt-8 flex flex-col items-center" style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
           {s.breath !== 'none' && !s.paused ? (
             <>
-              <div className="text-[28px] font-light tracking-wide" style={{ textShadow: `0 0 28px ${color2}` }}>{BREATH_WORD[s.breath]}</div>
-              <div className="text-[13px] opacity-60 mt-1">{pat.label}</div>
+              <div className="text-[28px] font-semibold tracking-wide" style={{ textShadow: `0 0 28px ${color2}` }}>{BREATH_WORD[s.breath]}</div>
+              <div className="text-[14px] opacity-75 mt-1">{pat.label}</div>
             </>
           ) : (
-            <div className="text-[20px] font-light opacity-85 tabular-nums">{s.paused ? 'עצירה' : s.done ? 'המסע נגמר' : fmt(remaining)}</div>
+            <div className="text-[20px] font-semibold opacity-85 tabular-nums">{s.paused ? 'עצירה' : s.done ? 'המסע נגמר' : fmt(remaining)}</div>
           )}
         </div>
       </div>
@@ -129,28 +129,28 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
             )
           })}
         </div>
-        <div className="flex justify-between text-[12px] opacity-70 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{spans.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
+        <div className="flex justify-between text-[13px] opacity-80 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{spans.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
 
         {/* track + transport */}
         <div className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(14,11,24,0.55)', border: '1px solid rgba(242,238,230,0.12)', backdropFilter: 'blur(14px)' }}>
           <div className="flex-1 min-w-0">
             <div className="text-[15px] truncate">{s.trackName || (isAlbum ? '…' : 'דרון מובנה')}</div>
-            <div className="text-[12px] opacity-60">{isAlbum && s.trackCount ? `רצועה ${s.trackNo} מתוך ${s.trackCount}` : `${PHASE_NAMES[s.phase]} · ${engine.plan.mode === 'breath' ? 'נשימה' : engine.plan.intention}`}</div>
+            <div className="text-[13px] opacity-75">{isAlbum && s.trackCount ? `רצועה ${s.trackNo} מתוך ${s.trackCount}` : `${PHASE_NAMES[s.phase]} · ${engine.plan.mode === 'breath' ? 'נשימה' : engine.plan.intention}`}</div>
           </div>
           {isAlbum && <button onClick={() => engine.prevTrack()} className="w-10 h-10 rounded-full text-[18px] opacity-85">⏮</button>}
           <button onClick={() => (s.paused ? engine.resume() : engine.pause())} className="w-12 h-12 rounded-full text-[18px]" style={{ background: `linear-gradient(135deg, ${color2}, ${color})`, color: '#0E0B18' }}>{s.paused ? '▶' : '❚❚'}</button>
           {isAlbum && <button onClick={() => engine.nextTrack()} className="w-10 h-10 rounded-full text-[18px] opacity-85">⏭</button>}
-          <button onClick={() => { engine.extend(600); flash('עוד עשר דקות') }} className="text-[12px] px-2 py-1 rounded-full border border-ink/25">+10</button>
+          <button onClick={() => { engine.extend(600); flash('עוד עשר דקות') }} className="text-[13px] px-2 py-1 rounded-full btn-ghost">+10</button>
         </div>
         <div className="flex items-center gap-3 px-1">
-          <span className="text-[14px] opacity-60">🔈</span>
+          <span className="text-[14px] opacity-75">🔈</span>
           <input type="range" min={0} max={1} step={0.02} value={s.musicGain} onChange={(e) => engine.setMusicGain(+e.target.value)} className="flex-1" />
-          <span className="text-[14px] opacity-60">🔊</span>
+          <span className="text-[14px] opacity-75">🔊</span>
         </div>
       </div>
 
       {hint && !s.done && (
-        <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+190px)] text-center text-[12px] opacity-70 leading-relaxed px-10" style={{ textShadow: '0 1px 8px #000' }}>
+        <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+190px)] text-center text-[13px] opacity-80 leading-relaxed px-10" style={{ textShadow: '0 1px 8px #000' }}>
           נגיעה במרכז – עצירה · לחיצה ארוכה – +10 דק' · החלקה למעלה – לחזרה · 3 שניות – חירום
         </div>
       )}
@@ -160,8 +160,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
         <div className="absolute inset-0 z-20 bg-bg/85 backdrop-blur-xl flex flex-col items-center justify-center px-8 gap-3 fade-in" data-ui onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
           <p className="text-[20px] text-center mb-2">לסיים את המסע עכשיו?</p>
           <button onClick={exit} className="w-full rounded-2xl py-4 btn-psy text-[17px]">סיים ועבור ליומן</button>
-          <button onClick={() => { engine.skipToReturn(); setConfirmExit(false) }} className="w-full rounded-2xl py-4 border border-ink/30 text-[17px]">דלג לשלב החזרה</button>
-          <button onClick={() => setConfirmExit(false)} className="text-[15px] opacity-70 py-3">המשך במסע</button>
+          <button onClick={() => { engine.skipToReturn(); setConfirmExit(false) }} className="w-full rounded-2xl py-4 btn-ghost text-[17px]">דלג לשלב החזרה</button>
+          <button onClick={() => setConfirmExit(false)} className="text-[15px] opacity-80 py-3">המשך במסע</button>
         </div>
       )}
     </div>

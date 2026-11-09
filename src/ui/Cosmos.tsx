@@ -73,7 +73,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
 
       // --- deep space ---
       const g0 = ctx.createLinearGradient(0, 0, 0, h)
-      g0.addColorStop(0, '#03020A'); g0.addColorStop(0.45, mix('#0A0614', c1, 0.12)); g0.addColorStop(1, mix('#1A0A1E', NEB.rose, 0.25))
+      g0.addColorStop(0, '#03020A'); g0.addColorStop(0.45, mix('#0A0614', c1, 0.12)); g0.addColorStop(1, mix('#140A1E', NEB.violet, 0.14))
       ctx.globalCompositeOperation = 'source-over'
       ctx.fillStyle = g0; ctx.fillRect(0, 0, w, h)
 
@@ -96,8 +96,8 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
         const col = mix(c.c, c.k < 0.5 ? c1 : c2, 0.15)
         const dxn = (x - cx) / w, dyn = (y - cy) / h
         const dist = Math.min(1, Math.sqrt(dxn * dxn + dyn * dyn) * 1.6)
-        const ceiling = s.ambient ? 0.42 : 0.24
-        ctx.globalAlpha = Math.min(ceiling, (s.ambient ? 0.2 : 0.09) + mid * (s.ambient ? 0.18 : 0.08) + energy * 0.05) * (0.35 + 0.65 * dist) * (peak ? 0.85 : 1)
+        const ceiling = s.ambient ? 0.3 : 0.12
+        ctx.globalAlpha = Math.min(ceiling, (s.ambient ? 0.14 : 0.045) + mid * (s.ambient ? 0.12 : 0.06) + energy * 0.05) * (0.35 + 0.65 * dist) * (peak ? 0.85 : 1)
         ctx.filter = 'none'
         // colorize the white sprite via composite trick: draw tinted rect through sprite mask
         ctx.save(); ctx.translate(x - r, y - r); ctx.scale(r * 2 / 256, r * 2 / 256)
@@ -111,7 +111,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
       for (let i = 0; i < RAYS; i++) {
         const a = rot + (i / RAYS) * Math.PI * 2
         const wob = 0.55 + 0.45 * Math.sin(t * 0.9 + rayPhase[i] + mid * 4)
-        const base = ((peak ? 0.10 : 0.075) * wob + pulse * 0.045) * (s.ambient ? 1.1 : 1)
+        const base = ((peak ? 0.06 : 0.045) * wob + pulse * 0.035) * (s.ambient ? 0.8 : 1)
         const spread = 0.012 + 0.012 * wob + bass * 0.01
         const edge = i % 3 === 0 ? NEB.cyan : i % 3 === 1 ? NEB.rose : NEB.gold
         const ex = Math.cos(a) * rayLen, ey = Math.sin(a) * rayLen
@@ -127,7 +127,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
       // --- hot core (white → peach → phase) ---
       const coreR = Math.min(w, h) * (s.ambient ? 0.11 : 0.16 + pulse * 0.06)
       const gc = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR)
-      gc.addColorStop(0, `rgba(255,255,255,${0.7 * drive})`); gc.addColorStop(0.15, rgba('#FFE9D6', 0.5 * drive)); gc.addColorStop(0.35, rgba(NEB.peach, 0.45 * drive)); gc.addColorStop(0.6, rgba(NEB.rose, 0.22)); gc.addColorStop(1, rgba(c1, 0))
+      gc.addColorStop(0, `rgba(255,255,255,${0.55 * drive})`); gc.addColorStop(0.15, rgba('#FFE9D6', 0.5 * drive)); gc.addColorStop(0.35, rgba(NEB.peach, 0.45 * drive)); gc.addColorStop(0.6, rgba(NEB.rose, 0.22)); gc.addColorStop(1, rgba(c1, 0))
       ctx.fillStyle = gc; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill()
       // lens flare streak (horizontal)
       const fl = ctx.createLinearGradient(cx - coreR * 2.2, cy, cx + coreR * 2.2, cy)
@@ -145,7 +145,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
       // tone cap: darken edges + lower half so the composite never washes to white
       ctx.globalCompositeOperation = 'multiply'
       const vg = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.25, cx, cy, Math.max(w, h) * 0.85)
-      vg.addColorStop(0, 'rgba(255,255,255,1)'); vg.addColorStop(1, s.ambient ? 'rgba(150,130,170,1)' : 'rgba(120,100,150,1)')
+      vg.addColorStop(0, 'rgba(255,255,255,1)'); vg.addColorStop(1, s.ambient ? 'rgba(120,105,150,1)' : 'rgba(78,66,108,1)')
       ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'source-over'
       raf = requestAnimationFrame(draw)

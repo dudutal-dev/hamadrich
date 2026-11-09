@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { Cosmos } from './Cosmos'
 import { type Asset, type JournalEntry, db, uid } from '../db'
 import { measureDuration, startRecording } from '../engine/library'
 
@@ -48,30 +47,30 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
   }
 
   return (
-    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto relative" style={{ background: "#070510" }}><Cosmos color="#7B2FD6" color2="#FF5FC8" intensity={0.5} phase={3} paused={false} />
-      <div className="text-[13px] opacity-70 tracking-widest">אינטגרציה</div>
-      <h2 className="text-[28px] font-normal leading-relaxed title-psy">{q}</h2>
+    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto relative"><div className="app-bg"><i /></div>
+      <div className="label">אינטגרציה</div>
+      <h2 className="text-[28px] font-semibold leading-relaxed title-psy">{q}</h2>
 
       <button onClick={toggleRec} className={`self-start rounded-full px-6 py-3 border text-[15px] transition-all ${rec ? 'border-red-400/70 text-red-300' : 'border-ink/25'}`}>
         {rec ? '● מקליט… לחץ לסיום' : blob ? '✓ הוקלט · הקלט שוב' : 'הקלט תשובה'}
       </button>
-      {transcript && <p className="text-[15px] opacity-70 leading-relaxed">{transcript}</p>}
+      {transcript && <p className="text-[15px] opacity-80 leading-relaxed">{transcript}</p>}
 
       <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="או בכתב…" rows={3}
         className="w-full bg-transparent border border-ink/12 rounded-xl p-3 text-[15px] outline-none placeholder:opacity-55 resize-none" />
 
       <div>
-        <div className="text-[13px] opacity-70 mb-2">שלוש מילים</div>
+        <div className="text-[14px] opacity-80 mb-2">שלוש מילים</div>
         <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="שקט, גוף, אור" className="w-full bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none placeholder:opacity-55" />
       </div>
 
       <div>
-        <div className="text-[13px] opacity-70 mb-3">איך אתה מרגיש עכשיו?</div>
+        <div className="text-[14px] opacity-80 mb-3">איך אתה מרגיש עכשיו?</div>
         <div className="flex justify-between max-w-xs">
           {[['1', 'כבד'], ['2', 'מתוח'], ['3', 'רגיל'], ['4', 'רגוע'], ['5', 'פתוח']].map(([n, l]) => (
             <button key={n} onClick={() => setMood(+n)} className="flex flex-col items-center gap-1">
-              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all ${mood === +n ? 'border-[#FF5FC8] bg-[#FF5FC8]/25 shadow-[0_0_20px_-4px_#FF5FC8]' : 'border-ink/15 opacity-75'}`}>{n}</span>
-              <span className="text-[11px] opacity-60">{l}</span>
+              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all ${mood === +n ? 'border-[#F062C0] bg-[#F062C0]/20 font-semibold' : 'border-ink/15 opacity-85'}`}>{n}</span>
+              <span className="text-[12.5px] opacity-75">{l}</span>
             </button>
           ))}
         </div>
@@ -79,7 +78,7 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
 
       <div className="mt-auto flex flex-col gap-3 pt-4">
         <button onClick={save} className="rounded-2xl py-4 text-[17px] btn-psy">שמור ביומן</button>
-        <button onClick={() => void db.journal.put(draft).then(onDone)} className="text-[15px] opacity-70 py-2">דלג</button>
+        <button onClick={() => void db.journal.put(draft).then(onDone)} className="text-[15px] opacity-80 py-2">דלג</button>
       </div>
     </div>
   )
