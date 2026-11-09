@@ -1,5 +1,6 @@
 import { breathWindowsFor } from './albumBreath'
-import { type Album, type Asset, type BreathPattern, type Cue, type Mode, type Phase, type PhaseSpan, type SessionPlan, type TextItem, uid } from '../db'
+import { type Address, VOICE_CLIPS, clipDur } from './voice'
+import { type Album, type Asset, type BreathPattern, type Cue, type Mode, type Phase, type PhaseSpan, type SessionPlan, uid } from '../db'
 
 export const PHASE_NAMES: Record<Phase, string> = {
   1: 'הגעה',
@@ -80,7 +81,6 @@ interface BuildInput {
   mode: Mode
   durationSec: number
   intention: string
-  texts: TextItem[]
   musicAssets: Asset[]
   album?: Album
   albumTracks?: Asset[]
@@ -90,15 +90,73 @@ interface BuildInput {
   startTrackNo?: number
   /** album: only play these phases (chapters) */
   onlyPhases?: Phase[]
+  /** narration address (masculine / feminine) */
+  address?: Address
 }
 
-/** Pick texts for a phase, preferring intention match; returns ids in order */
-function pickTexts(texts: TextItem[], phase: Phase, intention: string, count: number): TextItem[] {
-  const pool = texts.filter((t) => t.phases.includes(phase) && t.voiceAssetId)
-  const scored = pool
-    .map((t) => ({ t, s: (t.intentions.includes(intention) ? 2 : 0) + Math.random() }))
-    .sort((a, b) => b.s - a.s)
-  return scored.slice(0, count).map((x) => x.t)
+const shuffle = <T,>(a: T[]) => a.map((x) => [Math.random(), x] as const).sort((p, q) => p[0] - q[0]).map((p) => p[1])
+let address: Address = 'm' // set per buildPlan call
+const dur = (id: string) => clipDur(id, address)
+const breathFor = (mode: Mode, n: Phase, on: boolean): BreathPattern => (on && mode !== 'sleep' ? (mode === 'breath' && n === 3 ? 'coherent' : BREATH_BY_PHASE[n]) : 'none')
+
+/** Narration schedule for one session: never overlapping, phase-aware, sparse in the peak. */
+function scheduleVoice(mode: Mode, phases: PhaseSpan[], intention: string, breathOn: boolean) {
+  const voice: { t: number; id: string }[] = []
+  const breathStartAfter = new Map<Phase, number>() // phase → when its breath pattern may begin (after the intro that explains it)
+  let busy = -Infinity
+  const put = (t: number, id: string, limit = Infinity) => {
+    const at = Math.max(t, busy + 3)
+    if (at + dur(id) > limit) return false
+    voice.push({ t: at, id }); busy = at + dur(id); return true
+  }
+  for (const { n, startSec: s, endSec: e } of phases) {
+    const L = e - s
+    const bp = breathFor(mode, n, breathOn)
+    if (n === 1) {
+      put(s + 6, `open-${mode}`)
+      const it = VOICE_CLIPS.find((c) => c.group === 'intent' && c.intention === intention)
+      if (it) put(0, it.id)
+      // explain the exercise only if there is still room to actually do it in this phase
+      if ((bp === '478' || bp === 'coherent') && put(0, `intro-${bp}`, e - 40)) breathStartAfter.set(1, busy + 1.5)
+      else breathStartAfter.set(1, bp === 'none' ? s : Infinity)
+    } else if (n === 2) {
+      if (bp === 'coherent' && put(s + 3, 'intro-coherent', e - 30)) breathStartAfter.set(2, busy + 1.5)
+      const count = Math.min(5, Math.max(1, Math.floor(L / 240)))
+      shuffle(VOICE_CLIPS.filter((c) => c.group === 'release')).slice(0, count)
+        .forEach((c, i) => put(s + 60 + ((L - 120) * i) / count, c.id, e - 10))
+    } else if (n === 3) {
+      if (mode === 'sleep') { put(s + 90, 'close-sleep', e); continue }
+      if (mode === 'breath') continue
+      const lead = L > 900 ? 180 : 60
+      const count = Math.max(1, Math.floor((L - lead) / 420))
+      shuffle(VOICE_CLIPS.filter((c) => c.group === 'peak')).slice(0, count).forEach((c, i) => put(s + lead + i * 420, c.id, e - 20))
+    } else if (n === 4) {
+      const count = Math.min(4, Math.max(1, Math.floor(L / 150)))
+      const order = count >= 4 ? [1, 2, 3, 4] : count === 3 ? [1, 2, 4] : count === 2 ? [1, 4] : [1]
+      order.forEach((k, i) => put(s + 20 + ((L - 60) * i) / count, `return-${k}`, e - 5))
+    } else {
+      put(s + 10, 'close-gratitude', e)
+      put(Math.max(busy + 4, e - (dur('close-end') + dur('close-journal') + 9)), 'close-end')
+      put(0, 'close-journal')
+    }
+  }
+  return { voice, breathStartAfter }
+}
+
+/** pause breath guidance while narration speaks, then resume the pattern that was active */
+function clearBreathUnderVoice(input: Cue[]): Cue[] {
+  let out = [...input].sort((a, b) => a.t - b.t)
+  for (const v of out.filter((c) => c.layer === 'voice')) {
+    const a = v.t - 1, b = v.t + dur(v.clip ?? '') + 1.5
+    const before = out.filter((c) => c.layer === 'breath' && c.t <= a).pop()
+    const inside = out.filter((c) => c.layer === 'breath' && c.t > a && c.t < b)
+    const resume = inside.length ? inside[inside.length - 1].pattern : before?.pattern
+    if ((before?.pattern ?? 'none') === 'none' && inside.every((c) => c.pattern === 'none')) continue
+    out = out.filter((c) => !inside.includes(c))
+    out.push({ t: a, layer: 'breath', action: 'pattern', pattern: 'none' }, { t: b, layer: 'breath', action: 'pattern', pattern: resume ?? 'none' })
+    out.sort((p, q) => p.t - q.t)
+  }
+  return out
 }
 
 export function buildPlan(input: BuildInput): SessionPlan {
@@ -106,45 +164,26 @@ export function buildPlan(input: BuildInput): SessionPlan {
   if (mode === 'album' && input.album && input.albumTracks?.length) return buildAlbumPlan(input)
 
   const durationSec = input.durationSec
+  address = input.address ?? 'm'
   const phases = buildPhases(mode, durationSec)
-  const cues: Cue[] = []
+  const sched = input.voiceEnabled ? scheduleVoice(mode, phases, intention, input.breathEnabled) : { voice: [], breathStartAfter: new Map<Phase, number>() }
+  let cues: Cue[] = []
 
   for (const span of phases) {
     cues.push({ t: span.startSec, layer: 'visual', action: 'phase', phase: span.n })
     // music: one asset per phase if available, else drone handled by engine
     const m = input.musicAssets.filter((a) => a.phases.includes(span.n))
-    if (m.length) {
-      const pick = m[Math.floor(Math.random() * m.length)]
-      cues.push({ t: span.startSec, layer: 'music', action: 'play', asset: pick.id })
-    } else {
-      cues.push({ t: span.startSec, layer: 'music', action: 'play' }) // drone
-    }
-    // breath
-    const bp = input.breathEnabled && mode !== 'sleep' ? BREATH_BY_PHASE[span.n] : 'none'
-    cues.push({ t: span.startSec, layer: 'breath', action: 'pattern', pattern: mode === 'breath' && span.n === 3 ? 'coherent' : bp })
-
-    // voice
-    if (input.voiceEnabled && span.n !== 5) {
-      const len = span.endSec - span.startSec
-      const silenceLead = span.n === 3 || span.n === 4 ? 180 : 20
-      let n = 1
-      if (span.n === 3) n = Math.max(1, Math.floor((len - silenceLead) / 420))
-      else if (len > 600) n = 2
-      const chosen = pickTexts(input.texts, span.n, intention, n)
-      chosen.forEach((tx, i) => {
-        const t = span.n === 3
-          ? span.startSec + silenceLead + i * 420
-          : i === 0 ? span.startSec + silenceLead : span.endSec - tx.estSec - 30
-        if (t + tx.estSec < span.endSec) cues.push({ t, layer: 'voice', action: 'play', asset: tx.voiceAssetId, duck: -6 })
-      })
-    }
-    if (span.n === 5 && input.voiceEnabled) {
-      const [tx] = pickTexts(input.texts, 5, intention, 1)
-      if (tx) cues.push({ t: span.startSec + 10, layer: 'voice', action: 'play', asset: tx.voiceAssetId, duck: -6 })
-    }
+    if (m.length) cues.push({ t: span.startSec, layer: 'music', action: 'play', asset: m[Math.floor(Math.random() * m.length)].id })
+    else cues.push({ t: span.startSec, layer: 'music', action: 'play' }) // drone
+    // breath: starts after the narration that explains it
+    const bp = breathFor(mode, span.n, input.breathEnabled)
+    const bt = Math.max(span.startSec, sched.breathStartAfter.get(span.n) ?? span.startSec)
+    if (bt > span.startSec) cues.push({ t: span.startSec, layer: 'breath', action: 'pattern', pattern: 'none' })
+    if (bt < span.endSec - 20) cues.push({ t: bt, layer: 'breath', action: 'pattern', pattern: bp })
   }
-  cues.sort((a, b) => a.t - b.t)
-  return { id: uid(), mode, intention, durationSec, phases, cues, createdAt: new Date().toISOString() }
+  for (const v of sched.voice) if (v.t < durationSec) cues.push({ t: v.t, layer: 'voice', action: 'play', clip: v.id, duck: -7 })
+  cues = clearBreathUnderVoice(cues)
+  return { id: uid(), mode, intention, durationSec, phases, cues, address, createdAt: new Date().toISOString() }
 }
 
 /** Album mode: tracks play in order, phases follow the album's phaseMap; duration can shorten by skipping tracks */

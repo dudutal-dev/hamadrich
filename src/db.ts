@@ -49,6 +49,8 @@ export interface Cue {
   layer: Layer
   action: 'play' | 'stop' | 'pattern' | 'phase'
   asset?: string
+  /** built-in narration clip id (public/voice) */
+  clip?: string
   pattern?: BreathPattern
   phase?: Phase
   duck?: number
@@ -62,6 +64,8 @@ export interface SessionPlan {
   phases: PhaseSpan[]
   cues: Cue[]
   albumId?: string
+  /** narration version used by this session */
+  address?: 'm' | 'f'
   createdAt: string
 }
 
@@ -83,8 +87,6 @@ export interface JournalEntry {
 
 export interface Settings {
   id: 'main'
-  elevenKey?: string
-  voiceId?: string
   musicGain: number
   voiceGain: number
   breathGain: number
@@ -93,6 +95,8 @@ export interface Settings {
   binaural: boolean
   emergencyName?: string
   emergencyPhone?: string
+  /** listener address for narration + UI: masculine / feminine */
+  address?: 'm' | 'f'
 }
 
 export class HamadrichDB extends Dexie {

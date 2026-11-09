@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { type Asset, type JournalEntry, db, uid } from '../db'
 import { measureDuration, startRecording } from '../engine/library'
+import { g, useAddress } from '../address'
 
 const QUESTIONS = ['מה נשאר איתך?', 'מה הגוף אומר עכשיו?', 'מה היית רוצה לזכור מחר?', 'מה השתחרר?']
 
@@ -18,6 +19,7 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
   const [blob, setBlob] = useState<Blob | null>(null)
   const [transcript, setTranscript] = useState('')
   const sr = useRef<SRInstance | null>(null)
+  const a = useAddress()
 
   const toggleRec = async () => {
     if (rec) {
@@ -65,7 +67,7 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
       </div>
 
       <div>
-        <div className="text-[14px] opacity-80 mb-3">איך אתה מרגיש עכשיו?</div>
+        <div className="text-[14px] opacity-80 mb-3">{g(a, 'איך אתה מרגיש עכשיו?', 'איך את מרגישה עכשיו?')}</div>
         <div className="flex justify-between max-w-xs">
           {[['1', 'כבד'], ['2', 'מתוח'], ['3', 'רגיל'], ['4', 'רגוע'], ['5', 'פתוח']].map(([n, l]) => (
             <button key={n} onClick={() => setMood(+n)} className="flex flex-col items-center gap-1">

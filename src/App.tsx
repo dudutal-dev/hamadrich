@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { type JournalEntry, type SessionPlan, type Settings, db, getSettings, uid } from './db'
 import { SessionEngine } from './engine/audio'
 import { buildPlan } from './engine/plan'
-import { ensureSeed } from './engine/seed'
 import { IntegrationScreen } from './ui/IntegrationScreen'
 import { JournalScreen } from './ui/JournalScreen'
 import { JourneyScreen } from './ui/JourneyScreen'
@@ -12,6 +11,7 @@ import { StartScreen, type StartChoice } from './ui/StartScreen'
 import { AlbumScreen } from './ui/AlbumScreen'
 import { NavIcon } from './ui/NavIcon'
 import { takeJustUpdated } from './version'
+import { getAddress } from './address'
 
 // read once per page load: set right before an auto-update reload
 const justUpdated = takeJustUpdated()
@@ -32,7 +32,7 @@ export default function App() {
   const [updatedTo, setUpdatedTo] = useState(justUpdated)
   useEffect(() => { if (!updatedTo) return; const id = setTimeout(() => setUpdatedTo(null), 4500); return () => clearTimeout(id) }, [updatedTo])
 
-  useEffect(() => { void ensureSeed(); void getSettings().then(setSettings) }, [])
+  useEffect(() => { void getSettings().then(setSettings) }, [])
   useEffect(() => {
     document.body.dataset.journey = stage === 'journey' ? '1' : '0'
     if (stage !== 'journey') window.dispatchEvent(new Event('hamadrich:idle'))
@@ -40,11 +40,10 @@ export default function App() {
 
   const onStart = async (c: StartChoice) => {
     setChoice(c)
-    const texts = await db.texts.toArray()
     const music = (await db.assets.where('kind').equals('music').toArray()).filter((a) => !a.albumId)
     const album = c.albumId ? await db.albums.get(c.albumId) : undefined
     const albumTracks = c.albumId ? await db.assets.where('albumId').equals(c.albumId).toArray() : undefined
-    const p = buildPlan({ mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, texts, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
+    const p = buildPlan({ address: getAddress(), mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
     await db.plans.put(p)
     setPlan(p)
     setStage('prepare')

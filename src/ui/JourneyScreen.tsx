@@ -4,6 +4,7 @@ import { type EngineState, type SessionEngine, BREATH_PATTERNS } from '../engine
 import { PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import { Cosmos } from './Cosmos'
 import { Orb } from './Orb'
+import { g, useAddress } from '../address'
 
 const BREATH_WORD = { inhale: 'שאיפה', hold: 'החזק', exhale: 'נשיפה', hold2: 'החזק', none: '' } as const
 const fmt = (sec: number) => `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toString().padStart(2, '0')}`
@@ -21,6 +22,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const wakeLock = useRef<WakeLockSentinel | null>(null)
   const endedRef = useRef(false)
   const isAlbum = engine.plan.mode === 'album'
+  const a = useAddress()
 
   useEffect(() => { const off = engine.on(setS); return () => { off() } }, [engine])
   useEffect(() => { const id = setTimeout(() => setHint(false), 9000); return () => clearTimeout(id) }, [])
@@ -75,7 +77,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     return (
       <div className="h-full flex flex-col items-center justify-center px-8 text-center fade-in" style={{ background: 'radial-gradient(circle at 50% 30%, #4a3416 0%, #1a1208 60%)' }}>
         <div className="w-44 h-44 rounded-full mb-10 aura" style={{ background: 'radial-gradient(circle, #f3e2b3 0%, #d99a3c 55%, transparent 72%)', opacity: 0.7, boxShadow: '0 0 80px #d99a3c88' }} />
-        <p className="text-[20px] leading-relaxed mb-10">אתה בסדר. אמור את שמך. איפה אתה נמצא. הרגליים על הרצפה. נשימה איטית.</p>
+        <p className="text-[20px] leading-relaxed mb-10">{g(a, 'אתה בסדר. אמור את שמך. איפה אתה נמצא. הרגליים על הרצפה. נשימה איטית.', 'את בסדר. אמרי את שמך. איפה את נמצאת. הרגליים על הרצפה. נשימה איטית.')}</p>
         <button onClick={() => { setEmergency(false); engine.skipToReturn() }} className="w-full rounded-2xl py-5 text-[18px] bg-ink text-bg mb-3">חזרה הביתה</button>
         {settings.emergencyPhone && (
           <a href={`tel:${settings.emergencyPhone}`} className="w-full rounded-2xl py-5 text-[18px] border border-ink/40 block">התקשר ל{settings.emergencyName ? `-${settings.emergencyName}` : ''}</a>

@@ -1,5 +1,6 @@
 import { type Asset, type BreathPattern, type Cue, type Phase, type SessionPlan, db } from '../db'
 import { PHASE_NAMES } from './plan'
+import { voiceUrl } from './voice'
 
 const XFADE = 30 // seconds
 
@@ -340,6 +341,14 @@ export class SessionEngine {
     // drone/voice/breath also feed the analyser (via the music bus tap)
     this.musicBus.connect(this.analyser)
     // preload: voice cues are decoded (short); music stays as blobs and streams
+    // built-in narration clips used by this plan (+ the emergency anchor), fetched from the app bundle (precached → offline)
+    const clipIds = [...new Set([...this.plan.cues.filter((c) => c.layer === 'voice' && c.clip).map((c) => c.clip as string), 'emergency'])]
+    await Promise.all(clipIds.map(async (id) => {
+      try {
+        const r = await fetch(voiceUrl(id, this.plan.address ?? 'm'))
+        if (r.ok) this.buffers.set(`clip:${id}`, await ctx.decodeAudioData(await r.arrayBuffer()))
+      } catch (e) { console.warn('voice clip failed', id, e) }
+    }))
     const voiceIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'voice' && c.asset).map((c) => c.asset as string))]
     const musicIds = [...new Set(this.plan.cues.filter((c) => c.layer === 'music' && c.asset).map((c) => c.asset as string))]
     const voices = await db.assets.bulkGet(voiceIds)
@@ -347,6 +356,7 @@ export class SessionEngine {
       if (!a) return
       try { this.buffers.set(a.id, await ctx.decodeAudioData(await a.blob.arrayBuffer())) } catch (e) { console.warn('decode failed', a.name, e) }
     }))
+    await this.loadBreathClips(ctx)
     const music = await db.assets.bulkGet(musicIds)
     music.forEach((a?: Asset) => { if (a) { this.blobs.set(a.id, a.blob); this.names.set(a.id, a.name) } })
     // phases that will use the built-in drone → pre-render to looping files (background-safe)
@@ -449,6 +459,21 @@ export class SessionEngine {
     else this.finish()
   }
 
+  /** narration over the voice bus, ducking the music (graph bus + direct media element) for its length */
+  private voiceSrc: AudioBufferSourceNode | null = null
+  private playVoice(buf: AudioBuffer, duckDb: number) {
+    if (!this.ctx) return
+    try { this.voiceSrc?.stop() } catch { /* already ended */ }
+    const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.voiceBus); s.start()
+    this.voiceSrc = s
+    const duck = Math.pow(10, duckDb / 20)
+    const now = this.ctx.currentTime
+    this.musicBus.gain.cancelScheduledValues(now)
+    this.musicBus.gain.setTargetAtTime(this.gains.music * duck, now, 0.8)
+    this.musicBus.gain.setTargetAtTime(this.gains.music, now + buf.duration + 1, 1.5)
+    if (this.current instanceof Track) { this.current.duck(duck, 0.8); setTimeout(() => (this.current instanceof Track) && this.current.duck(1, 1.5), (buf.duration + 1) * 1000) }
+  }
+
   private playDrone(phase: Phase, fade: number, binaural = this.binaural, name = '') {
     if (!this.ctx) return
     const prev = this.current
@@ -485,16 +510,8 @@ export class SessionEngine {
         this.playDrone(this.state.phase, XFADE)
       }
     }
-    if (c.layer === 'voice' && c.action === 'play' && c.asset && this.buffers.has(c.asset)) {
-      const buf = this.buffers.get(c.asset)!
-      const s = this.ctx.createBufferSource(); s.buffer = buf; s.connect(this.voiceBus); s.start()
-      const duck = Math.pow(10, (c.duck ?? -6) / 20)
-      const now = this.ctx.currentTime
-      this.musicBus.gain.cancelScheduledValues(now)
-      this.musicBus.gain.setTargetAtTime(this.gains.music * duck, now, 0.8)
-      this.musicBus.gain.setTargetAtTime(this.gains.music, now + buf.duration + 1, 1.5)
-      if (this.current instanceof Track) { this.current.duck(duck, 0.8); setTimeout(() => (this.current instanceof Track) && this.current.duck(1, 1.5), (buf.duration + 1) * 1000) }
-    }
+    const vkey = c.clip ? `clip:${c.clip}` : c.asset
+    if (c.layer === 'voice' && c.action === 'play' && vkey && this.buffers.has(vkey)) this.playVoice(this.buffers.get(vkey)!, c.duck ?? -6)
     if (c.layer === 'breath' && c.action === 'pattern') {
       this.breathPattern = c.pattern ?? 'none'
       this.breathStart = this.elapsed
@@ -520,82 +537,38 @@ export class SessionEngine {
     this.state.breath = step; this.state.breathProgress = prog
   }
 
-  private noiseBuf: AudioBuffer | null = null
-  private getNoise(): AudioBuffer {
-    if (this.noiseBuf) return this.noiseBuf
-    const ctx = this.ctx!
-    const len = ctx.sampleRate * 12
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
-    const d = buf.getChannelData(0)
-    // pink-ish noise: smoother than white, closer to breath
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
-    for (let i = 0; i < len; i++) {
-      const w = Math.random() * 2 - 1
-      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852
-      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926
-    }
-    this.noiseBuf = buf
-    return buf
+  /** real recorded breaths (ElevenLabs Sound Effects, trimmed + time-fitted offline): public/breath/{in|out}-{sec}-{1|2}.mp3 */
+  private breathClips = new Map<string, AudioBuffer>()
+  private breathAlt = 0
+  private async loadBreathClips(ctx: AudioContext) {
+    const names = ['in-4', 'in-5.5', 'out-4', 'out-5.5', 'out-8'].flatMap((n) => [`${n}-1`, `${n}-2`])
+    await Promise.all(names.map(async (n) => {
+      try {
+        const r = await fetch(`${import.meta.env.BASE_URL}breath/${n}.mp3`)
+        if (r.ok) this.breathClips.set(n, await ctx.decodeAudioData(await r.arrayBuffer()))
+      } catch { /* offline before first cache – breath stays visual + haptic */ }
+    }))
   }
 
-  /** Realistic breath: INHALE THROUGH THE NOSE (narrow, bright hiss with nasal resonance), EXHALE THROUGH THE MOUTH (wide, soft, low "hhh"). */
+  /** Breath sound: inhale through the nose / exhale through the mouth, the clip closest to the step length, alternating takes */
   private breathTone(step: BreathStep, dur: number) {
-    if (!this.ctx || !dur) return
+    if (!this.ctx || !dur || (step !== 'inhale' && step !== 'exhale')) return
+    const lens = step === 'inhale' ? [4, 5.5] : [4, 5.5, 8]
+    const len = lens.reduce((a, b) => (Math.abs(b - dur) < Math.abs(a - dur) ? b : a))
+    this.breathAlt = (this.breathAlt + 1) % 2
+    const buf = this.breathClips.get(`${step === 'inhale' ? 'in' : 'out'}-${len}-${this.breathAlt + 1}`)
+    if (!buf) return
     const ctx = this.ctx, now = ctx.currentTime
-    const src = ctx.createBufferSource(); src.buffer = this.getNoise(); src.loop = true
-    src.playbackRate.value = 0.92 + Math.random() * 0.16
-    const g = ctx.createGain(); g.gain.value = 0
-    const nodes: AudioNode[] = []
-
-    if (step === 'inhale') {
-      // NOSE: two resonances (nasal cavity ~ 1.2k and ~2.8k), narrow, rising as the airflow increases
-      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700
-      const r1 = ctx.createBiquadFilter(); r1.type = 'bandpass'; r1.Q.value = 2.2
-      const r2 = ctx.createBiquadFilter(); r2.type = 'bandpass'; r2.Q.value = 3.0
-      const mix1 = ctx.createGain(); mix1.gain.value = 0.7
-      const mix2 = ctx.createGain(); mix2.gain.value = 0.55
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 6500
-      src.connect(hp); hp.connect(r1); hp.connect(r2); r1.connect(mix1); r2.connect(mix2); mix1.connect(lp); mix2.connect(lp); lp.connect(g)
-      r1.frequency.setValueAtTime(1000, now); r1.frequency.exponentialRampToValueAtTime(1450, now + dur * 0.8)
-      r2.frequency.setValueAtTime(2300, now); r2.frequency.exponentialRampToValueAtTime(3100, now + dur * 0.8)
-      // envelope: gradual swell, fullest near the end, quick close
-      const peak = 1.1
-      g.gain.setValueAtTime(0.0001, now)
-      g.gain.exponentialRampToValueAtTime(peak * 0.35, now + dur * 0.25)
-      g.gain.exponentialRampToValueAtTime(peak * 0.8, now + dur * 0.6)
-      g.gain.exponentialRampToValueAtTime(peak, now + dur * 0.85)
-      g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
-      nodes.push(hp, r1, r2, mix1, mix2, lp)
-    } else {
-      // MOUTH: wide, breathy, dark. broad low-mid body + soft air; darkens as the lungs empty
-      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 120
-      const body = ctx.createBiquadFilter(); body.type = 'bandpass'; body.Q.value = 0.5
-      const air = ctx.createBiquadFilter(); air.type = 'bandpass'; air.Q.value = 0.8
-      const bg = ctx.createGain(); bg.gain.value = 0.9
-      const ag = ctx.createGain(); ag.gain.value = 0.35
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'
-      src.connect(hp); hp.connect(body); hp.connect(air); body.connect(bg); air.connect(ag); bg.connect(lp); ag.connect(lp); lp.connect(g)
-      body.frequency.setValueAtTime(650, now); body.frequency.exponentialRampToValueAtTime(260, now + dur)
-      air.frequency.setValueAtTime(2600, now); air.frequency.exponentialRampToValueAtTime(1400, now + dur)
-      lp.frequency.setValueAtTime(3800, now); lp.frequency.exponentialRampToValueAtTime(900, now + dur)
-      // envelope: soft rounded onset (lips open), long relaxed decay, trailing off
-      const peak = 1.0
-      g.gain.setValueAtTime(0.0001, now)
-      g.gain.exponentialRampToValueAtTime(peak * 0.6, now + Math.min(0.45, dur * 0.12))
-      g.gain.exponentialRampToValueAtTime(peak, now + Math.min(1.0, dur * 0.25))
-      g.gain.exponentialRampToValueAtTime(peak * 0.55, now + dur * 0.6)
-      g.gain.exponentialRampToValueAtTime(peak * 0.2, now + dur * 0.88)
-      g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
-      nodes.push(hp, body, air, bg, ag, lp)
-    }
-    g.connect(this.breathBus)
-    // micro-tremor of airflow
-    const lfo = ctx.createOscillator(); lfo.frequency.value = step === 'inhale' ? 7 + Math.random() * 2 : 4.5 + Math.random() * 1.5
-    const lg = ctx.createGain(); lg.gain.value = step === 'inhale' ? 0.06 : 0.05
-    lfo.connect(lg); lg.connect(g.gain); lfo.start(now); lfo.stop(now + dur + 0.1)
-    src.start(now); src.stop(now + dur + 0.1)
-    setTimeout(() => { nodes.forEach((n) => n.disconnect()); g.disconnect() }, (dur + 0.3) * 1000)
+    const src = ctx.createBufferSource(); src.buffer = buf
+    // small rate nudge fits the clip to odd step lengths (±15%) without audible pitch change on breath noise
+    const rate = Math.min(1.15, Math.max(0.85, buf.duration / (dur * 0.94)))
+    src.playbackRate.value = rate
+    const g = ctx.createGain(); g.gain.value = step === 'inhale' ? 1.15 : 0.95
+    src.connect(g); g.connect(this.breathBus)
+    const end = now + Math.min(buf.duration / rate, dur)
+    g.gain.setValueAtTime(g.gain.value, Math.max(now, end - 0.3)); g.gain.linearRampToValueAtTime(0, end)
+    src.start(now); src.stop(end + 0.05)
+    src.onended = () => { src.disconnect(); g.disconnect() }
   }
 
   pause() {
@@ -695,6 +668,8 @@ export class SessionEngine {
     this.calmMode = true
     this.pendingMusic = null
     this.playDrone(5, 4, false, 'עיגון')
+    const anchor = this.buffers.get('clip:emergency')
+    if (anchor) setTimeout(() => { if (this.calmMode) this.playVoice(anchor, -9) }, 2500)
     this.breathPattern = 'coherent'; this.breathStart = this.elapsed; this.state.breathPattern = 'coherent'
     if (this.state.paused) this.resume()
     this.emit()
