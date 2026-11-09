@@ -11,6 +11,7 @@ import { StartScreen, type StartChoice } from './ui/StartScreen'
 import { AlbumScreen } from './ui/AlbumScreen'
 import { NavIcon } from './ui/NavIcon'
 import { takeJustUpdated } from './version'
+import { getAddress } from './address'
 
 // read once per page load: set right before an auto-update reload
 const justUpdated = takeJustUpdated()
@@ -42,7 +43,7 @@ export default function App() {
     const music = (await db.assets.where('kind').equals('music').toArray()).filter((a) => !a.albumId)
     const album = c.albumId ? await db.albums.get(c.albumId) : undefined
     const albumTracks = c.albumId ? await db.assets.where('albumId').equals(c.albumId).toArray() : undefined
-    const p = buildPlan({ mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
+    const p = buildPlan({ address: getAddress(), mode: c.mode, durationSec: c.minutes * 60, intention: c.intention, musicAssets: music, album, albumTracks, voiceEnabled: c.voice, breathEnabled: c.breath, startTrackNo: c.startTrackNo, onlyPhases: c.onlyPhases })
     await db.plans.put(p)
     setPlan(p)
     setStage('prepare')

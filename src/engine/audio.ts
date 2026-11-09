@@ -345,7 +345,7 @@ export class SessionEngine {
     const clipIds = [...new Set([...this.plan.cues.filter((c) => c.layer === 'voice' && c.clip).map((c) => c.clip as string), 'emergency'])]
     await Promise.all(clipIds.map(async (id) => {
       try {
-        const r = await fetch(voiceUrl(id))
+        const r = await fetch(voiceUrl(id, this.plan.address ?? 'm'))
         if (r.ok) this.buffers.set(`clip:${id}`, await ctx.decodeAudioData(await r.arrayBuffer()))
       } catch (e) { console.warn('voice clip failed', id, e) }
     }))

@@ -64,6 +64,8 @@ export interface SessionPlan {
   phases: PhaseSpan[]
   cues: Cue[]
   albumId?: string
+  /** narration version used by this session */
+  address?: 'm' | 'f'
   createdAt: string
 }
 
@@ -93,6 +95,8 @@ export interface Settings {
   binaural: boolean
   emergencyName?: string
   emergencyPhone?: string
+  /** listener address for narration + UI: masculine / feminine */
+  address?: 'm' | 'f'
 }
 
 export class HamadrichDB extends Dexie {

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { type Album, type Asset, type Phase, db } from '../db'
 import { INTENTIONS, INTENTION_META, PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import type { StartChoice } from './StartScreen'
+import { g, useAddress } from '../address'
 
 async function fetchAlbum(): Promise<{ album: Album | null; tracks?: Asset[] }> {
   const a = await db.albums.toCollection().first()
@@ -22,6 +23,7 @@ const CHAPTER_TEXT: Record<Phase, { title: string; sub: string }> = {
 const fmt = (sec: number) => `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toString().padStart(2, '0')}`
 
 export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) {
+  const a = useAddress()
   const [album, setAlbum] = useState<Album | null>(null)
   const [tracks, setTracks] = useState<Asset[]>([])
   const [intention, setIntention] = useState('שקט')
@@ -141,7 +143,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
                           {([1, 2, 3, 4, 5] as Phase[]).map((p) => <option key={p} value={p}>{PHASE_NAMES[p]}</option>)}
                         </select>
                       ) : (
-                        <button onClick={() => start({ startTrackNo: t.trackNo })} className="text-[13px] opacity-85 underline underline-offset-4 shrink-0">התחל מכאן</button>
+                        <button onClick={() => start({ startTrackNo: t.trackNo })} className="text-[13px] opacity-85 underline underline-offset-4 shrink-0">{g(a, 'התחל מכאן', 'התחילי מכאן')}</button>
                       )}
                     </div>
                   ))}
@@ -159,6 +161,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
 
 
 function IntroSheet({ onClose }: { onClose: () => void }) {
+  const a = useAddress()
   return (
     <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={onClose}>
       <div className="fade-in w-full max-h-[92vh] overflow-y-auto rounded-t-[32px] px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-5" style={{ background: 'linear-gradient(180deg, #E8842E33, #15112A 25%)', border: '1px solid rgba(242,238,230,0.12)' }} onClick={(e) => e.stopPropagation()}>
@@ -177,11 +180,11 @@ function IntroSheet({ onClose }: { onClose: () => void }) {
         <Section title="איך לעבור את זה">
           <ul className="list-disc pr-5 flex flex-col gap-1.5">
             <li>בשכיבה, עיניים עצומות, אוזניות אם אפשר. בלי טלפון ביד – האפליקציה יודעת לבד.</li>
-            <li>אל תנסה להבין את המילים. תן להן לעבור כמו מים. מה שרלוונטי יישאר.</li>
+            <li>{g(a, 'אל תנסה להבין את המילים. תן להן לעבור כמו מים.', 'אל תנסי להבין את המילים. תני להן לעבור כמו מים.')} מה שרלוונטי יישאר.</li>
             <li>בפרק השיא (רצועות 16–32) האפליקציה שותקת לגמרי – בלי נשימה, בלי אור. זה מכוון.</li>
             <li>הנשימה המונחית נכנסת רק בפתיחות ובסיומים האינסטרומנטליים, לעולם לא מעל הקול.</li>
             <li>אם משהו נהיה כבד – לחיצה ארוכה של שלוש שניות. יש דרך הביתה תמיד.</li>
-            <li>בסוף, לפני שאתה קם: שאלה אחת ליומן. זה החלק שבו המסע הופך לשלך.</li>
+            <li>{g(a, 'בסוף, לפני שאתה קם:', 'בסוף, לפני שאת קמה:')} שאלה אחת ליומן. זה החלק שבו המסע הופך לשלך.</li>
           </ul>
         </Section>
         <p className="text-[13px] opacity-70 leading-relaxed">המדריך מלווה האזנה, נשימה ומדיטציה. הוא אינו מדריך לחומרים ואינו תחליף לליווי אנושי.</p>

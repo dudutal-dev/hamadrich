@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { type Album, type Asset, type Phase, type Settings, db, getSettings } from '../db'
 import { deleteAlbum, importAlbum, importMusic } from '../engine/library'
-import { VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceGroup, voiceUrl } from '../engine/voice'
+import { VOICE_CLIPS, VOICE_GROUP_NAMES, type VoiceGroup, clipText, voiceUrl } from '../engine/voice'
+import { g, useAddress } from '../address'
+import { AddressPicker } from './AddressPicker'
 import { PHASE_NAMES } from '../engine/plan'
 import { checkForUpdate, versionLabel } from '../version'
 
@@ -26,19 +28,21 @@ export function LibraryScreen() {
 
 /* ---------- Narration (built-in, read-only) ---------- */
 function Narration() {
+  const a = useAddress()
   const [playing, setPlaying] = useState<string | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
   useEffect(() => () => { audio.current?.pause() }, [])
   const toggle = (id: string) => {
     audio.current?.pause()
     if (playing === id) { setPlaying(null); return }
-    const a = new Audio(voiceUrl(id)); a.onended = () => setPlaying(null)
-    audio.current = a; void a.play().catch(() => setPlaying(null)); setPlaying(id)
+    const el = new Audio(voiceUrl(id, a)); el.onended = () => setPlaying(null)
+    audio.current = el; void el.play().catch(() => setPlaying(null)); setPlaying(id)
   }
   const groups = (Object.keys(VOICE_GROUP_NAMES) as VoiceGroup[]).map((g) => ({ g, clips: VOICE_CLIPS.filter((c) => c.group === g) }))
   const total = Math.round(VOICE_CLIPS.reduce((t, c) => t + c.dur, 0) / 60)
   return (
     <div className="flex flex-col gap-5">
+      <AddressPicker />
       <p className="text-[14px] muted leading-relaxed">{VOICE_CLIPS.length} קטעי קריינות בעברית · כ-{total} דקות · קול "המדריך". הם משולבים במסע לפי המצב, הכוונה והשלב, ועובדים גם בלי רשת.</p>
       {groups.map(({ g, clips }) => (
         <section key={g} className="flex flex-col gap-2">
@@ -47,8 +51,8 @@ function Narration() {
             <div key={c.id} className="card rounded-2xl p-4 flex gap-3 items-start">
               <button onClick={() => toggle(c.id)} aria-label="האזן" className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-[14px] ${playing === c.id ? 'btn-psy' : 'btn-ghost'}`}>{playing === c.id ? '■' : '▶'}</button>
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline gap-2"><div className="text-[16px] font-medium">{c.title}</div><div className="text-[13px] muted tabular-nums">{Math.round(c.dur)} שנ'</div></div>
-                <p className={`text-[14px] muted leading-relaxed mt-1 ${playing === c.id ? '' : 'line-clamp-2'}`}>{c.text.replace(/([.,])\s*\.\.\./g, '$1').replace(/\.\.\./g, '…')}</p>
+                <div className="flex justify-between items-baseline gap-2"><div className="text-[16px] font-medium">{c.title}</div><div className="text-[13px] muted tabular-nums">{Math.round(a === 'f' && c.durF ? c.durF : c.dur)} שנ'</div></div>
+                <p className={`text-[14px] muted leading-relaxed mt-1 ${playing === c.id ? '' : 'line-clamp-2'}`}>{clipText(c, a).replace(/([.,])\s*\.\.\./g, '$1').replace(/\.\.\./g, '…')}</p>
               </div>
             </div>
           ))}
@@ -60,6 +64,7 @@ function Narration() {
 
 /* ---------- Music ---------- */
 function Music() {
+  const addr = useAddress()
   const [albums, setAlbums] = useState<Album[]>([])
   const [loose, setLoose] = useState<Asset[]>([])
   const [busy, setBusy] = useState('')
@@ -87,10 +92,10 @@ function Music() {
     <div className="flex flex-col gap-5">
       <section className="card rounded-2xl p-4 flex flex-col gap-3">
         <div className="text-[18px] font-semibold">אלבום כמסע</div>
-        <p className="text-[14px] opacity-85 leading-relaxed">בחר את קובץ ה-ZIP שהורדת מ-Bandcamp (או את כל ה-MP3 בבת אחת). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
+        <p className="text-[14px] opacity-85 leading-relaxed">{g(addr, 'בחר', 'בחרי')} את קובץ ה-ZIP שהורדת מ-Bandcamp (או את כל ה-MP3 בבת אחת). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
         <input value={albumName} onChange={(e) => setAlbumName(e.target.value)} className="bg-transparent border-b border-ink/15 py-1 text-[15px] outline-none" />
         <input ref={albumInput} type="file" accept="audio/*,.zip,application/zip" multiple hidden onChange={(e) => onAlbum(e.target.files)} />
-        <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 btn-ghost text-[15px]">בחר ZIP או קבצים</button>
+        <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 btn-ghost text-[15px]">{g(addr, 'בחר', 'בחרי')} ZIP או קבצים</button>
         {albums.map((a) => (
           <div key={a.id} className="flex justify-between items-center text-[15px] pt-2 border-t border-ink/10">
             <span>{a.name} · {a.trackCount} רצועות · {Math.round(a.totalSec / 60)} דק'</span>
@@ -133,6 +138,11 @@ function SettingsPane() {
   const save = (patch: Partial<Settings>) => { const n = { ...s, ...patch }; setS(n); void db.settings.put(n) }
   return (
     <div className="flex flex-col gap-6 text-[15px]">
+      <section className="flex flex-col gap-3">
+        <div className="text-[18px] font-semibold">פנייה</div>
+        <AddressPicker />
+        <p className="text-[14px] opacity-80">הקריינות והטקסטים באפליקציה פונים אליך בלשון שבחרת. הקול נשאר אותו קול.</p>
+      </section>
       <section className="flex flex-col gap-3">
         <div className="text-[18px] font-semibold">פלט</div>
         <div className="grid grid-cols-2 gap-2">

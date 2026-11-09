@@ -1,5 +1,5 @@
 import { breathWindowsFor } from './albumBreath'
-import { VOICE_CLIPS, voiceClip } from './voice'
+import { type Address, VOICE_CLIPS, clipDur } from './voice'
 import { type Album, type Asset, type BreathPattern, type Cue, type Mode, type Phase, type PhaseSpan, type SessionPlan, uid } from '../db'
 
 export const PHASE_NAMES: Record<Phase, string> = {
@@ -90,10 +90,13 @@ interface BuildInput {
   startTrackNo?: number
   /** album: only play these phases (chapters) */
   onlyPhases?: Phase[]
+  /** narration address (masculine / feminine) */
+  address?: Address
 }
 
 const shuffle = <T,>(a: T[]) => a.map((x) => [Math.random(), x] as const).sort((p, q) => p[0] - q[0]).map((p) => p[1])
-const dur = (id: string) => voiceClip(id)?.dur ?? 20
+let address: Address = 'm' // set per buildPlan call
+const dur = (id: string) => clipDur(id, address)
 const breathFor = (mode: Mode, n: Phase, on: boolean): BreathPattern => (on && mode !== 'sleep' ? (mode === 'breath' && n === 3 ? 'coherent' : BREATH_BY_PHASE[n]) : 'none')
 
 /** Narration schedule for one session: never overlapping, phase-aware, sparse in the peak. */
@@ -161,6 +164,7 @@ export function buildPlan(input: BuildInput): SessionPlan {
   if (mode === 'album' && input.album && input.albumTracks?.length) return buildAlbumPlan(input)
 
   const durationSec = input.durationSec
+  address = input.address ?? 'm'
   const phases = buildPhases(mode, durationSec)
   const sched = input.voiceEnabled ? scheduleVoice(mode, phases, intention, input.breathEnabled) : { voice: [], breathStartAfter: new Map<Phase, number>() }
   let cues: Cue[] = []
@@ -179,7 +183,7 @@ export function buildPlan(input: BuildInput): SessionPlan {
   }
   for (const v of sched.voice) if (v.t < durationSec) cues.push({ t: v.t, layer: 'voice', action: 'play', clip: v.id, duck: -7 })
   cues = clearBreathUnderVoice(cues)
-  return { id: uid(), mode, intention, durationSec, phases, cues, createdAt: new Date().toISOString() }
+  return { id: uid(), mode, intention, durationSec, phases, cues, address, createdAt: new Date().toISOString() }
 }
 
 /** Album mode: tracks play in order, phases follow the album's phaseMap; duration can shorten by skipping tracks */

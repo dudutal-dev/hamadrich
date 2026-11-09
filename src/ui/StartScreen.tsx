@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type Album, type Mode, type Phase, db } from '../db'
 import { Halo } from './Halo'
+import { g, hasChosenAddress, useAddress } from '../address'
+import { AddressPicker } from './AddressPicker'
 import { INTENTIONS, INTENTION_META, MODE_LONG, MODE_META, PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
 
 export interface StartChoice { mode: Mode; minutes: number; intention: string; voice: boolean; breath: boolean; albumId?: string; startTrackNo?: number; onlyPhases?: Phase[] }
@@ -25,6 +27,8 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [album, setAlbum] = useState<Album | null>(null)
   const [info, setInfo] = useState<Mode | null>(null)
   const [adv, setAdv] = useState(false)
+  const a = useAddress()
+  const [askAddress, setAskAddress] = useState(() => !hasChosenAddress())
   const [hour] = useState(() => new Date().getHours())
   const greeting = hour < 5 ? 'לילה טוב' : hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : hour < 21 ? 'ערב טוב' : 'לילה טוב'
 
@@ -42,8 +46,17 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         <Halo size={190} className="absolute -left-10 -top-12 opacity-90 pointer-events-none" />
         <div className="relative text-[16px] muted">{greeting}</div>
         <h1 className="relative text-[44px] title-psy leading-tight">המדריך</h1>
-        <p className="opacity-80 text-[15px] mt-1">בחר מסע, כוונה ומשך. השאר קורה לבד.</p>
+        <p className="opacity-80 text-[15px] mt-1">{g(a, 'בחר', 'בחרי')} מסע, כוונה ומשך. השאר קורה לבד.</p>
       </header>
+
+      {askAddress && (
+        <section className="fade-in card rounded-3xl p-5 flex flex-col gap-3">
+          <div className="text-[18px] font-semibold">איך לפנות אליך?</div>
+          <p className="text-[14px] muted leading-relaxed">המדריכה תדבר אליך בלשון שתבחר/י. אפשר לשנות בכל רגע בספרייה ← הגדרות.</p>
+          <AddressPicker />
+          <button onClick={() => setAskAddress(false)} className="btn-psy rounded-2xl py-3 text-[16px]">{g(a, 'המשך', 'המשיכי')}</button>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <div className="label">המסע</div>
@@ -122,7 +135,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
 
       <button onClick={() => onStart({ mode, minutes, intention, voice: mode !== 'album' && voice, breath, albumId: mode === 'album' ? album?.id : undefined })}
         className="fixed bottom-[calc(env(safe-area-inset-bottom)+68px)] right-5 left-5 rounded-2xl py-4 text-[18px] btn-psy active:scale-[0.98] transition-transform">
-        התחל {MODE_META[mode].name} · {minutes} דק'
+        {g(a, 'התחל', 'התחילי')} {MODE_META[mode].name} · {minutes} דק'
       </button>
 
       {info && createPortal(
@@ -138,7 +151,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
               </div>
               <p className="text-[14px] opacity-85 leading-relaxed">{MODE_LONG[info].phases}</p>
             </div>
-            <button onClick={() => { pick(info); setInfo(null) }} className="rounded-2xl py-4 btn-psy text-[17px] mt-2">בחר {MODE_META[info].name}</button>
+            <button onClick={() => { pick(info); setInfo(null) }} className="rounded-2xl py-4 btn-psy text-[17px] mt-2">{g(a, 'בחר', 'בחרי')} {MODE_META[info].name}</button>
           </div>
         </div>,
         document.body,
