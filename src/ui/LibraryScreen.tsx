@@ -68,7 +68,7 @@ function Music() {
   const [albums, setAlbums] = useState<Album[]>([])
   const [loose, setLoose] = useState<Asset[]>([])
   const [busy, setBusy] = useState('')
-  const [albumName, setAlbumName] = useState('Psychedelic Prayers')
+  const [albumName, setAlbumName] = useState('')
   const albumInput = useRef<HTMLInputElement>(null)
   const looseInput = useRef<HTMLInputElement>(null)
   const [loosePhases, setLoosePhases] = useState<Phase[]>([3])
@@ -80,7 +80,7 @@ function Music() {
   const onAlbum = async (files: FileList | null) => {
     if (!files?.length) return
     setBusy('מתחיל…')
-    try { await importAlbum([...files], albumName || 'אלבום', setBusy) } catch (e) { setBusy('שגיאה: ' + String(e)); return }
+    try { await importAlbum([...files], albumName.trim() || files[0].name.replace(/\.[^.]+$/, ''), setBusy) } catch (e) { setBusy('שגיאה: ' + String(e)); return }
     setBusy(''); await reload()
   }
   const onLoose = async (files: FileList | null) => {
@@ -93,7 +93,7 @@ function Music() {
       <section className="card rounded-2xl p-4 flex flex-col gap-3">
         <div className="text-[18px] font-semibold">אלבום כמסע</div>
         <p className="text-[14px] opacity-85 leading-relaxed">{g(addr, 'בחר', 'בחרי')} את קובץ ה-ZIP שהורדת מ-Bandcamp (או את כל ה-MP3 בבת אחת). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
-        <input value={albumName} onChange={(e) => setAlbumName(e.target.value)} className="bg-transparent border-b border-ink/15 py-1 text-[15px] outline-none" />
+        <input value={albumName} onChange={(e) => setAlbumName(e.target.value)} placeholder="שם האלבום" className="bg-transparent border-b border-ink/15 py-1 text-[15px] outline-none" />
         <input ref={albumInput} type="file" accept="audio/*,.zip,application/zip" multiple hidden onChange={(e) => onAlbum(e.target.files)} />
         <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 btn-ghost text-[15px]">{g(addr, 'בחר', 'בחרי')} ZIP או קבצים</button>
         {albums.map((a) => (

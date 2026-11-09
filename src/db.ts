@@ -29,6 +29,8 @@ export interface Asset {
   gainDb: number
   albumId?: string
   trackNo?: number
+  /** imported albums: instrumental windows [start,end] s (no narration) where breath guidance may run */
+  breathWindows?: [number, number][]
   createdAt: string
 }
 

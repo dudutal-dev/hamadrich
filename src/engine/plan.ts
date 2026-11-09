@@ -31,7 +31,7 @@ export const MODE_META: Record<Mode, { name: string; sub: string; defaultMin: nu
   meditation: { name: 'מדיטציה', sub: 'ישיבה יומית, שתיקות ארוכות', defaultMin: 35, minMin: 20, maxMin: 60 },
   deep: { name: 'מסע עמוק', sub: 'חמישה שלבים מלאים, עיניים עצומות', defaultMin: 90, minMin: 45, maxMin: 120 },
   sleep: { name: 'שינה', sub: 'דעיכה הדרגתית לשקט', defaultMin: 30, minMin: 15, maxMin: 45 },
-  album: { name: 'תפילות פסיכדליות', sub: 'האלבום כמסע שלם, 55 רצועות', defaultMin: 93, minMin: 30, maxMin: 93 },
+  album: { name: 'אלבום', sub: 'אלבום שלם כמסע', defaultMin: 93, minMin: 30, maxMin: 93 },
 }
 
 export const INTENTIONS = ['שקט', 'שחרור', 'בהירות', 'ריפוי', 'חיבור', 'הודיה']
@@ -50,7 +50,7 @@ export const MODE_LONG: Record<Mode, { what: string; when: string; phases: strin
   meditation: { what: 'ישיבה שקטה עם קריינות בתחילת ובסוף כל שלב ושתיקות ארוכות ביניהן.', when: 'תרגול יומי, לפני/אחרי טאי צ\'י, Gateway, ערב שקט.', phases: 'חמישה שלבים, השיא כמעט ללא מילים' },
   deep: { what: 'מסע מלא של שעה עד שעתיים: כל חמשת השלבים, קריינות עברית לפי הכוונה, שיא ארוך ושקט, חזרה הדרגתית, אינטגרציה ויומן.', when: 'סשן עצמאי בעיניים עצומות, בשכיבה, בלי הפרעות. כפתור חירום פעיל.', phases: 'הגעה 10% → שחרור 20% → שיא 35% → חזרה 25% → אינטגרציה 10%' },
   sleep: { what: 'דעיכה הדרגתית לשקט, בלי שלב חזרה ובלי קריינות בסוף – האפליקציה נכבית לבד.', when: 'הירדמות.', phases: 'הגעה → שחרור → שיא שהולך ונעלם' },
-  album: { what: 'האלבום Psychedelic Prayers כמסע שלם: 55 הרצועות בסדר המקורי, ממופות לחמשת השלבים, עם נשימה, אורב ויומן.', when: 'כשרוצים את הקול של סוסייה ואת המוזיקה של Desert Dwellers בלי להתעסק בנגן.', phases: 'רצועות 1–4 הגעה · 5–15 שחרור · 16–32 שיא · 33–49 חזרה · 50–55 אינטגרציה' },
+  album: { what: 'אלבום שלם כמסע: הרצועות בסדר המקורי, ממופות לחמשת השלבים, עם נשימה בקטעים בלי דיבור, אורב ויומן.', when: 'כשרוצים שהמוזיקה והקול של האלבום יובילו, בלי להתעסק בנגן.', phases: 'הפרקים לפי מיפוי האלבום (ניתן לעריכה בלשונית אלבומים)' },
 }
 
 /** phase shares per mode (sum = 1) */
@@ -229,7 +229,7 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
     cues.push({ t, layer: 'music', action: 'play', asset: tr.id })
     // synced breath: only inside this track's instrumental windows (no narration), pattern by phase; never in the peak
     if (input.breathEnabled && p !== 3) {
-      const wins = breathWindowsFor(tr.trackNo, tr.durationSec) ?? []
+      const wins = tr.breathWindows ?? breathWindowsFor(tr.trackNo, tr.durationSec) ?? []
       const pattern: BreathPattern = p === 1 ? '478' : 'coherent'
       for (const [a, b] of wins) {
         if (b - a < 11) continue
@@ -243,22 +243,30 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
   return { id: uid(), mode: 'album', intention: input.intention, durationSec: Math.round(t), phases, cues, albumId: album.id, createdAt: new Date().toISOString() }
 }
 
-/** default phase map for the Psychedelic Prayers album (55 tracks) */
-export function defaultAlbumPhaseMap(trackCount: number): Record<number, Phase> {
+/** the Psychedelic Prayers album (55 tracks): has its own phase map, breath map and texts */
+export const isPsychedelicPrayers = (a: Pick<Album, 'name' | 'trackCount'>) => a.trackCount === 55 && /psychedelic\s*prayers|תפילות/i.test(a.name)
+
+/** default phase map: Psychedelic Prayers' known chapters, otherwise split by cumulative listening time (deep-journey shares) */
+export function defaultAlbumPhaseMap(trackCount: number, durations?: number[]): Record<number, Phase> {
   const map: Record<number, Phase> = {}
   if (trackCount === 55) {
-    for (let i = 1; i <= 55; i++) {
-      map[i] = i <= 4 ? 1 : i <= 15 ? 2 : i <= 32 ? 3 : i <= 49 ? 4 : 5
-    }
+    for (let i = 1; i <= 55; i++) map[i] = i <= 4 ? 1 : i <= 15 ? 2 : i <= 32 ? 3 : i <= 49 ? 4 : 5
     return map
   }
   const shares = SHARES.deep
-  let acc = 0
   const bounds: number[] = []
-  for (const n of [1, 2, 3, 4, 5] as Phase[]) { acc += shares[n]; bounds.push(Math.round(acc * trackCount)) }
+  let acc = 0
+  for (const n of [1, 2, 3, 4, 5] as Phase[]) { acc += shares[n]; bounds.push(acc) }
+  const total = durations?.reduce((a, b) => a + b, 0) || trackCount
+  let t = 0
   for (let i = 1; i <= trackCount; i++) {
-    map[i] = i <= bounds[0] ? 1 : i <= bounds[1] ? 2 : i <= bounds[2] ? 3 : i <= bounds[3] ? 4 : 5
+    const d = durations?.[i - 1] || total / trackCount
+    const mid = (t + d / 2) / total // a track belongs to the phase its midpoint falls in
+    map[i] = (mid <= bounds[0] ? 1 : mid <= bounds[1] ? 2 : mid <= bounds[2] ? 3 : mid <= bounds[3] ? 4 : 5) as Phase
+    t += d
   }
+  // every phase gets at least one track when there are enough tracks
+  if (trackCount >= 5) for (const n of [1, 5] as Phase[]) if (!Object.values(map).includes(n)) map[n === 1 ? 1 : trackCount] = n
   return map
 }
 

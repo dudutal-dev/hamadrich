@@ -86,7 +86,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
             </div>
           )
         })}
-        <p className="text-[14px] opacity-75 leading-relaxed px-1">{album ? 'מסע האלבום Psychedelic Prayers נמצא בלשונית "האלבום".' : 'יש לך את האלבום Psychedelic Prayers? ייבא אותו בספרייה ← מוזיקה, והוא יקבל פרק משלו.'}</p>
+        <p className="text-[14px] opacity-75 leading-relaxed px-1">{album ? 'מסעות מאלבומים נמצאים בלשונית "אלבומים" – אפשר לייבא שם כמה אלבומים.' : 'יש לך אלבום שבנוי כמסע (למשל Psychedelic Prayers)? ייבא אותו בלשונית "אלבומים".'}</p>
       </section>
 
       <section className="card rounded-3xl p-5">
