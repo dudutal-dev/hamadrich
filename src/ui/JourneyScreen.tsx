@@ -125,7 +125,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       {/* center */}
       <div className={`relative flex-1 flex ${tv && landscape ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${tv ? 'justify-center' : 'justify-start pt-6'}`}>
         <div ref={orbRef}>{isCouple
-          ? <CoupleFigures label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: Math.round(Math.min(vp.w * 0.96, orbSize * 1.6)), h: Math.round(orbSize * 1.15) }}
+          ? <CoupleFigures label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: Math.round(Math.min(vp.w * 0.96, tv && landscape ? vp.w * 0.6 : vp.w)), h: Math.round(tv ? vp.h * (landscape ? 0.86 : 0.62) : Math.min(vp.h * 0.5, orbSize * 1.75)) }}
               breath={s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.breath === 'hold2' ? 0 : -1} />
           : <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} />}</div>
         <div className={`${tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
