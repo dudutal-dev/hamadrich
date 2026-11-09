@@ -329,7 +329,11 @@ export class SessionEngine {
   }
 
   on(l: Listener) { this.listeners.add(l); return () => this.listeners.delete(l) }
-  private emit() { this.listeners.forEach((l) => l({ ...this.state })) }
+  private emit() { this.lastEmit = performance.now(); this.listeners.forEach((l) => l({ ...this.state })) }
+  /** UI updates from the frame loop are throttled (~10/s); discrete events still emit immediately */
+  private lastEmit = 0
+  private emittedBreath: BreathStep | null = null
+  private emitThrottled() { if (performance.now() - this.lastEmit > 100 || this.state.breath !== this.emittedBreath) { this.emittedBreath = this.state.breath; this.emit() } }
 
   async init(opts: { haptics: boolean; gains: { music: number; voice: number; breath: number }; output?: 'speakers' | 'headphones'; binaural?: boolean }) {
     this.vibrate = opts.haptics
@@ -451,7 +455,7 @@ export class SessionEngine {
     }
     this.updateBreath(t)
     if (!this.calmMode && t >= this.toSession(this.plan.durationSec)) { this.finish(); return }
-    this.emit()
+    this.emitThrottled()
     if (!document.hidden) this.raf = requestAnimationFrame(this.tick)
   }
 

@@ -29,7 +29,9 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
     const cv = ref.current!
     const ctx = cv.getContext('2d', { alpha: false })!
     let w = 0, h = 0
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    // everything here is soft (nebulae, rays, glow): render well below screen resolution and let CSS upscale – ~10× fewer pixels
+    const dpr = Math.min(0.75, (window.devicePixelRatio || 1) * 0.5)
+    const starScale = 1
     const resize = () => { w = cv.clientWidth; h = cv.clientHeight; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0) }
     resize(); window.addEventListener('resize', resize)
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -44,7 +46,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
     const stars = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.3 + 0.3, tw: Math.random() * Math.PI * 2, sp: 0.4 + Math.random() * 1.2, c: Math.random() }))
     // cloud bank: lower half is denser (like the reference), colors cycle through the nebula palette
     const palette = [NEB.coral, NEB.peach, NEB.rose, NEB.magenta, NEB.cyan, NEB.violet, NEB.peach, NEB.gold, NEB.cyan, NEB.coral]
-    const clouds = Array.from({ length: 34 }, (_, i) => ({
+    const clouds = Array.from({ length: 20 }, (_, i) => ({
       x: Math.random(), y: i < 10 ? Math.random() * 0.5 : 0.4 + Math.random() * 0.6, r: 0.16 + Math.random() * 0.3,
       a: Math.random() * Math.PI * 2, sp: 0.015 + Math.random() * 0.03, c: palette[i % palette.length], k: Math.random(),
     }))
@@ -52,12 +54,16 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
     const rayPhase = Array.from({ length: RAYS }, () => Math.random() * Math.PI * 2)
     const dust = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), s: 0.4 + Math.random() * 1.2, p: Math.random() * Math.PI * 2 }))
 
-    let t0 = performance.now(), t = 0, raf = 0
+    let t0 = performance.now(), t = 0, raf = 0, lastDraw = 0
+    let focusAt = 0, focusPt: { x: number; y: number } | null = null
     // smoothed audio
     let bass = 0, mid = 0, high = 0, energy = 0, beat = 0, lastBass = 0
     const lerp = (a: number, b: number, k: number) => a + (b - a) * k
 
     const draw = (now: number) => {
+      // 30 fps is plenty for slow cosmic motion and halves GPU/CPU load
+      if (now - lastDraw < 31) { raf = requestAnimationFrame(draw); return }
+      lastDraw = now
       const s = st.current
       const dt = s.paused ? 0 : Math.min(0.05, (now - t0) / 1000); t0 = now; t += dt
       const lv = s.levels?.() ?? { bass: 0, mid: 0, high: 0, energy: 0 }
@@ -69,7 +75,8 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
       const drive = s.ambient ? 0.5 : 1
       const pulse = Math.min(1, s.intensity * 0.35 + bass * 0.45 + beat * 0.35)
 
-      const f = s.focus?.()
+      if (now - focusAt > 500) { focusPt = s.focus?.() ?? null; focusAt = now } // layout read twice a second, not every frame
+      const f = focusPt
       const cx = f ? f.x : w / 2, cy = f ? f.y : s.ambient ? h * 0.2 : h * 0.31
       const peak = s.phase === 3
       const c1 = s.color, c2 = s.color2
@@ -85,7 +92,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
         const tw = 0.5 + 0.5 * Math.sin(t * sx.sp + sx.tw)
         const a = (0.25 + tw * 0.55) * (0.7 + high * 0.8)
         ctx.fillStyle = sx.c < 0.15 ? rgba(NEB.cyan, a) : sx.c < 0.3 ? rgba(NEB.peach, a) : `rgba(255,255,255,${a})`
-        ctx.beginPath(); ctx.arc(sx.x * w, sx.y * h, sx.r * (0.8 + tw * 0.5 + high * 0.6), 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.arc(sx.x * w, sx.y * h, starScale * sx.r * (0.8 + tw * 0.5 + high * 0.6), 0, Math.PI * 2); ctx.fill()
       }
 
       // --- nebula clouds (additive sprites) ---
@@ -143,7 +150,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
         const x = (d.x + Math.sin(t * 0.4 + d.p) * 0.015 + 1) % 1
         const a = (0.15 + 0.35 * Math.abs(Math.sin(t * 2 + d.p))) * (0.6 + high * 1.2)
         ctx.fillStyle = d.p % 2 < 1 ? rgba(NEB.gold, a) : rgba(NEB.cyan, a)
-        ctx.beginPath(); ctx.arc(x * w, (1 - y) * h, 0.8 + d.s * (0.6 + high), 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.arc(x * w, (1 - y) * h, starScale * (0.8 + d.s * (0.6 + high)), 0, Math.PI * 2); ctx.fill()
       }
       // tone cap: darken edges + lower half so the composite never washes to white
       ctx.globalCompositeOperation = 'multiply'

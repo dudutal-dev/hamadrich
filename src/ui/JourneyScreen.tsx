@@ -82,7 +82,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const dimAll = peak && !awake && !tv
   const ui = { opacity: awake ? 1 : tv ? 0 : 0.6, transition: 'opacity 1200ms', pointerEvents: (tv && !awake ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] }
   const landscape = vp.w > vp.h
-  const orbSize = Math.round(tv ? Math.min(vp.w, vp.h) * (landscape ? 0.66 : 0.72) : Math.min(290, vp.h * 0.38, vp.w * 0.78))
+  const compact = landscape && !tv // phone rotated by accident (e.g. lying down): keep everything on screen
+  const orbSize = Math.round(tv ? Math.min(vp.w, vp.h) * (landscape ? 0.66 : 0.72) : compact ? Math.min(220, vp.h * 0.45) : Math.min(290, vp.h * 0.38, vp.w * 0.78))
 
   if (emergency) {
     return (
@@ -158,7 +159,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
         <div className="flex justify-between text-[13px] opacity-80 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{spans.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
 
         {/* track + transport */}
-        <div className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(14,11,24,0.55)', border: '1px solid rgba(242,238,230,0.12)', backdropFilter: 'blur(14px)' }}>
+        {!compact && <><div className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(14,11,24,0.55)', border: '1px solid rgba(242,238,230,0.12)', backdropFilter: 'blur(14px)' }}>
           <div className="flex-1 min-w-0">
             <div className="text-[15px] truncate">{s.trackName || (isAlbum ? '…' : 'דרון מובנה')}</div>
             <div className="text-[13px] opacity-75">{isAlbum && s.trackCount ? `רצועה ${s.trackNo} מתוך ${s.trackCount}` : `${PHASE_NAMES[s.phase]} · ${engine.plan.mode === 'breath' ? 'נשימה' : engine.plan.intention}`}</div>
@@ -172,10 +173,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
           <span className="text-[14px] opacity-75">🔈</span>
           <input type="range" min={0} max={1} step={0.02} value={s.musicGain} onChange={(e) => engine.setMusicGain(+e.target.value)} className="flex-1" />
           <span className="text-[14px] opacity-75">🔊</span>
-        </div>
+        </div></>}
       </div>}
 
-      {hint && !s.done && !tv && (
+      {hint && !s.done && !tv && !compact && (
         <div className="fade-in absolute bottom-[calc(env(safe-area-inset-bottom)+190px)] text-center text-[13px] opacity-80 leading-relaxed px-10" style={{ textShadow: '0 1px 8px #000' }}>
           נגיעה במרכז – עצירה · לחיצה ארוכה – +10 דק' · החלקה למעלה – לחזרה · 3 שניות – חירום
         </div>

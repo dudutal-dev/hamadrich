@@ -80,6 +80,6 @@ export const isCoupleUnlocked = () => { try { return localStorage.getItem(COUPLE
 export const unlockCouple = () => { try { localStorage.setItem(COUPLE_KEY, '1') } catch { /* private mode */ } }
 
 export const MUSIC_TITLES: Record<string, string> = {
-  'body-1a': 'אמביינט חם', 'body-1b': 'מרחב עמוק', 'body-2a': 'חושני · דופק איטי', 'body-2b': 'חושני · עמוק',
-  fire: 'תוף טקסי', 'couple-a': 'אינטימי', 'couple-b': 'לילה', groove: 'גרוב איטי',
+  'body-1a': 'אמביינט חם', 'body-1b': 'מרחב עמוק', 'body-2a': 'פסיבייאנט חושני', 'body-2b': 'פסיבייאנט עמוק',
+  fire: 'דאב טקסי', 'couple-a': 'קוסמי-טנטרי', 'couple-b': 'לילה קוסמי', groove: 'דאב חושני',
 }
