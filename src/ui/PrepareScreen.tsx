@@ -38,7 +38,7 @@ export function PrepareScreen({ mode, journey, onBegin, onCancel, loading }: { m
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % shown.length), 6000); return () => clearInterval(id) }, [shown.length])
 
   return (
-    <div className="fade-in h-full flex flex-col items-center justify-between px-6 pt-16 pb-10 text-center relative overflow-hidden">
+    <div className="fade-in h-full flex flex-col items-center justify-between px-6 pt-[calc(env(safe-area-inset-top)+3rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)] text-center relative overflow-hidden">
       <div className="app-bg"><i /></div>
       <div className="relative">
         <div className="label">הכנה</div>

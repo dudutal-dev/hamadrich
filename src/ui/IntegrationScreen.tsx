@@ -49,7 +49,7 @@ export function IntegrationScreen({ draft, question, onDone }: { draft: JournalE
   }
 
   return (
-    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-14 pb-8 overflow-y-auto relative"><div className="app-bg"><i /></div>
+    <div className="fade-in h-full flex flex-col gap-7 px-6 pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)] overflow-y-auto relative"><div className="app-bg"><i /></div>
       <div className="label">אינטגרציה</div>
       <h2 className="text-[28px] font-semibold leading-relaxed title-psy">{q}</h2>
 
