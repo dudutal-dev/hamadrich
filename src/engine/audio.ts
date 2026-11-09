@@ -212,8 +212,9 @@ class Track {
 /** Render a phase drone to a looping WAV blob (offline), so it can play as a media element and survive iOS backgrounding */
 const LOOP_SEC = 30
 const droneCache = new Map<string, Blob>()
+const droneKey = (phase: Phase, output: 'speakers' | 'headphones', binaural: boolean) => `${phase}-${output}-${binaural}`
 export async function renderDroneBlob(phase: Phase, output: 'speakers' | 'headphones', binaural: boolean): Promise<Blob> {
-  const key = `${phase}-${output}-${binaural}`
+  const key = droneKey(phase, output, binaural)
   const cached = droneCache.get(key); if (cached) return cached
   const sr = 22050
   const off = new OfflineAudioContext(2, sr * LOOP_SEC, sr)
@@ -257,16 +258,22 @@ export class SessionEngine {
   private freq = new Uint8Array(0)
   private current: Drone | Track | null = null
   private cueIdx = 0
-  private startCtxTime = 0
+  /** session clock is wall-clock based: the AudioContext may be suspended by iOS in the background while media elements keep playing */
+  private startWall = 0
   private pausedAt = 0
-  private offset = 0 // accumulated extension seconds applied to future cues
+  /** "+10 min" insertions, in plan time: at plan time `at` the session holds for `sec` seconds; later cues shift */
+  private ins: { at: number; sec: number }[] = []
+  /** music cue chosen while paused (seek/next/prev) – started on resume */
+  private pendingMusic: Cue | null = null
+  /** emergency: quiet anchor drone, timeline frozen until seek/stop */
+  private calmMode = false
+  private musicCues: Cue[]
   private raf = 0
   private ivl = 0
   private listeners = new Set<Listener>()
   private buffers = new Map<string, AudioBuffer>()
   private blobs = new Map<string, Blob>()
   private names = new Map<string, string>()
-  private droneBlobs = new Map<Phase, Blob>()
   private breathPattern: BreathPattern = 'none'
   private breathStart = 0
   private lastBreathStep: BreathStep = 'none'
@@ -277,7 +284,29 @@ export class SessionEngine {
   state: EngineState
 
   constructor(public plan: SessionPlan) {
-    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: plan.cues.filter((c) => c.layer === 'music' && c.asset).length, musicGain: 0.8 }
+    this.musicCues = plan.cues.filter((c) => c.layer === 'music' && c.asset)
+    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: this.musicCues.length, musicGain: 0.8 }
+  }
+
+  private now() { return Date.now() / 1000 }
+
+  /** plan time → session time (adds every insertion made before it) */
+  private toSession(p: number) { let s = p; for (const i of this.ins) if (i.at < p) s += i.sec; return s }
+  /** session time → plan time; gap=true while inside a "+10" insertion */
+  private toPlan(s: number): { p: number; gap: boolean } {
+    let acc = 0
+    for (const i of this.ins) {
+      const start = i.at + acc
+      if (s <= start) break
+      if (s < start + i.sec) return { p: i.at, gap: true }
+      acc += i.sec
+    }
+    return { p: s - acc, gap: false }
+  }
+
+  /** phase spans in session time (stretched by "+10" insertions) – for the phase strip */
+  phaseSpans() {
+    return this.plan.phases.map((p) => ({ n: p.n, startSec: this.toSession(p.startSec), endSec: this.toSession(p.endSec) }))
   }
 
   /** audio-reactive levels for visuals: { bass, mid, high, energy } 0..1 */
@@ -325,9 +354,12 @@ export class SessionEngine {
     for (const c of this.plan.cues) if (c.layer === 'music' && c.action === 'play' && !c.asset) dronePhases.add(this.plan.phases.find((p) => c.t >= p.startSec && c.t < p.endSec)?.n ?? 3)
     const order = [...dronePhases].sort((a, b) => a - b)
     const first = order.find((ph) => this.plan.phases[0]?.n === ph) ?? order[0]
-    if (first !== undefined) { try { this.droneBlobs.set(first, await renderDroneBlob(first, this.output, this.binaural)) } catch (e) { console.warn('drone render failed', e) } }
-    // the rest render lazily while the session runs (each ~1–2 s)
-    void (async () => { for (const ph of order) if (ph !== first) { try { this.droneBlobs.set(ph, await renderDroneBlob(ph, this.output, this.binaural)) } catch { /* fallback to live drone */ } } })()
+    if (first !== undefined) { try { await renderDroneBlob(first, this.output, this.binaural) } catch (e) { console.warn('drone render failed', e) } }
+    // the rest render lazily while the session runs (each ~1–2 s); last: the emergency anchor drone
+    void (async () => {
+      for (const ph of order) if (ph !== first) { try { await renderDroneBlob(ph, this.output, this.binaural) } catch { /* fallback to live drone */ } }
+      try { await renderDroneBlob(5, this.output, false) } catch { /* live fallback */ }
+    })()
     this.state.musicGain = this.gains.music
     this.setupMediaSession()
     document.addEventListener('visibilitychange', this.onVisibility)
@@ -353,13 +385,18 @@ export class SessionEngine {
   start() {
     if (!this.ctx) throw new Error('init first')
     void this.ctx.resume()
-    this.startCtxTime = this.ctx.currentTime
+    this.startWall = this.now()
     this.state.running = true
     this.cueIdx = 0
     this.tick()
     this.keepAlive()
     // rAF stops in background; a coarse interval keeps cues firing (track changes) while the screen is off
-    this.ivl = window.setInterval(() => { if (!this.state.running || this.state.paused) return; if (this.current instanceof Track) { this.current.kick(); this.current.syncShadow() } if (document.hidden) this.tick() }, 1000)
+    this.ivl = window.setInterval(() => {
+      if (!this.state.running || this.state.paused) return
+      if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume().catch(() => {})
+      if (this.current instanceof Track) { this.current.kick(); this.current.syncShadow() }
+      if (document.hidden) this.tick()
+    }, 1000)
   }
 
   /** silent looping buffer keeps iOS audio session alive in background */
@@ -374,22 +411,60 @@ export class SessionEngine {
   get elapsed() {
     if (!this.ctx) return 0
     if (this.state.paused) return this.pausedAt
-    return this.ctx.currentTime - this.startCtxTime
+    return this.now() - this.startWall
   }
 
   private tick = () => {
     if (!this.state.running || this.state.paused) return
     cancelAnimationFrame(this.raf)
+    if (!this.calmMode) this.checkAlbumEnd()
+    if (!this.state.running) return
     const t = this.elapsed
     this.state.t = t
-    // fire due cues
-    while (this.cueIdx < this.plan.cues.length && this.plan.cues[this.cueIdx].t + this.offset <= t) {
-      this.fire(this.plan.cues[this.cueIdx++])
+    if (!this.calmMode) {
+      const due: Cue[] = []
+      while (this.cueIdx < this.plan.cues.length && this.toSession(this.plan.cues[this.cueIdx].t) <= t) due.push(this.plan.cues[this.cueIdx++])
+      if (due.length) this.fireDue(due, t)
     }
     this.updateBreath(t)
-    if (t >= this.plan.durationSec + this.offset) { this.finish(); return }
+    if (!this.calmMode && t >= this.toSession(this.plan.durationSec)) { this.finish(); return }
     this.emit()
     if (!document.hidden) this.raf = requestAnimationFrame(this.tick)
+  }
+
+  /** fire due cues; after a background stall only the latest state per layer is applied (no burst of track restarts, no stale narration) */
+  private fireDue(due: Cue[], t: number) {
+    const last = (layer: Cue['layer']) => { for (let i = due.length - 1; i >= 0; i--) if (due[i].layer === layer) return due[i]; return undefined }
+    for (const c of [last('visual'), last('breath'), last('music')]) if (c) this.fire(c)
+    for (const c of due) if (c.layer === 'voice' && t - this.toSession(c.t) < 5) this.fire(c)
+  }
+
+  /** album: a track finished before its successor's cue → fill a "+10" gap with the phase drone, otherwise move straight on */
+  private checkAlbumEnd() {
+    if (this.plan.mode !== 'album' || !(this.current instanceof Track) || !this.current.ended) return
+    const { p, gap } = this.toPlan(this.elapsed)
+    if (gap) { this.playDrone(this.state.phase, 4, this.binaural, 'דרון · הארכה'); return }
+    const next = this.musicCues.find((c) => c.t > p + 0.01)
+    if (next) this.seek(next.t)
+    else this.finish()
+  }
+
+  private playDrone(phase: Phase, fade: number, binaural = this.binaural, name = '') {
+    if (!this.ctx) return
+    const prev = this.current
+    const blob = droneCache.get(droneKey(phase, this.output, binaural))
+    this.current = blob
+      ? new Track(this.ctx, this.musicBus, blob, true, 0, fade, true, this.gains.music, this.analyser)
+      : new Drone(this.ctx, this.musicBus, phase, this.output, binaural, fade)
+    prev?.stop(fade)
+    this.state.trackName = name
+  }
+
+  private setTrackInfo(c: Cue) {
+    if (!c.asset) { this.state.trackName = ''; return }
+    this.state.trackName = this.names.get(c.asset) ?? ''
+    this.state.trackNo = this.musicCues.indexOf(c) + 1
+    if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.title = this.state.trackName || 'המדריך'
   }
 
   private fire(c: Cue) {
@@ -405,15 +480,9 @@ export class SessionEngine {
         const isAlbum = this.plan.mode === 'album'
         this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music, this.analyser)
         prev?.stop(isAlbum ? 1.5 : XFADE)
-        this.state.trackName = this.names.get(c.asset) ?? ''
-        this.state.trackNo = this.plan.cues.filter((x) => x.layer === 'music' && x.asset).indexOf(c) + 1
-        if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.title = this.state.trackName || 'המדריך'
+        this.setTrackInfo(c)
       } else {
-        const blob = this.droneBlobs.get(this.state.phase)
-        if (blob) this.current = new Track(this.ctx, this.musicBus, blob, true, 0, XFADE, true, this.gains.music, this.analyser)
-        else this.current = new Drone(this.ctx, this.musicBus, this.state.phase, this.output, this.binaural)
-        prev?.stop(XFADE)
-        this.state.trackName = ''
+        this.playDrone(this.state.phase, XFADE)
       }
     }
     if (c.layer === 'voice' && c.action === 'play' && c.asset && this.buffers.has(c.asset)) {
@@ -542,17 +611,23 @@ export class SessionEngine {
   resume() {
     if (!this.state.paused || !this.ctx) return
     void this.ctx.resume().then(() => {
-      this.startCtxTime = this.ctx!.currentTime - this.pausedAt
+      if (!this.state.paused) return
+      this.startWall = this.now() - this.pausedAt
       this.state.paused = false
-      if (this.current instanceof Track) this.current.resume()
+      if (this.pendingMusic) { const c = this.pendingMusic; this.pendingMusic = null; this.fire(c) }
+      else if (this.current instanceof Track) this.current.resume()
       this.tick()
     })
   }
 
   /** +N minutes: push all future cues and the end */
   extend(sec = 600) {
-    this.offset += sec
-    this.state.durationSec = this.plan.durationSec + this.offset
+    if (!this.state.running) return
+    const { p } = this.toPlan(this.elapsed)
+    this.ins.push({ at: p, sec }); this.ins.sort((a, b) => a.at - b.at)
+    this.state.durationSec = this.toSession(this.plan.durationSec)
+    // album tracks don't loop: the gap after the current track is filled with the phase drone (pre-render it now)
+    if (this.plan.mode === 'album') void renderDroneBlob(this.state.phase, this.output, this.binaural).catch(() => {})
     this.emit()
   }
 
@@ -560,9 +635,9 @@ export class SessionEngine {
   nextTrack() { this.jumpTrack(1) }
   prevTrack() { this.jumpTrack(-1) }
   private jumpTrack(dir: 1 | -1) {
-    const music = this.plan.cues.filter((c) => c.layer === 'music' && c.asset)
+    const music = this.musicCues
     if (!music.length) return
-    const t = this.elapsed - this.offset
+    const t = this.toPlan(this.elapsed).p
     let idx = music.findIndex((c, i) => t >= c.t && (i === music.length - 1 || t < music[i + 1].t))
     if (idx < 0) idx = 0
     // prev: if more than 5s into track, restart it
@@ -589,8 +664,10 @@ export class SessionEngine {
 
   private seek(planT: number) {
     if (!this.ctx) return
-    if (this.state.paused) { this.pausedAt = planT + this.offset }
-    this.startCtxTime = this.ctx.currentTime - (planT + this.offset)
+    this.calmMode = false
+    const st = this.toSession(planT)
+    if (this.state.paused) this.pausedAt = st
+    this.startWall = this.now() - st
     this.cueIdx = 0
     // re-fire state cues up to planT without audio restarts except music
     const stateCues = this.plan.cues.filter((c) => c.t <= planT)
@@ -599,18 +676,28 @@ export class SessionEngine {
     const lastBreath = [...stateCues].reverse().find((c) => c.layer === 'breath')
     if (lastPhase) this.fire(lastPhase)
     if (lastBreath) this.fire(lastBreath)
-    if (lastMusic) this.fire(lastMusic)
+    if (lastMusic) {
+      // paused: don't start audio now, but make sure the right music starts on resume (not the old track)
+      if (this.state.paused) { this.pendingMusic = lastMusic; this.setTrackInfo(lastMusic) }
+      else { this.pendingMusic = null; this.fire(lastMusic) }
+    }
     this.cueIdx = this.plan.cues.findIndex((c) => c.t > planT)
     if (this.cueIdx < 0) this.cueIdx = this.plan.cues.length
+    this.state.t = this.elapsed
+    this.updateBreath(this.state.t)
+    this.emit()
   }
 
   /** emergency: drop to quiet drone, calm */
   calm() {
     if (!this.ctx) return
-    const prev = this.current
-    this.current = new Drone(this.ctx, this.musicBus, 5, this.output, false)
-    prev?.stop(4)
+    // freeze the timeline: no music/voice/breath cues replace the anchor until "home" (seek) or stop
+    this.calmMode = true
+    this.pendingMusic = null
+    this.playDrone(5, 4, false, 'עיגון')
     this.breathPattern = 'coherent'; this.breathStart = this.elapsed; this.state.breathPattern = 'coherent'
+    if (this.state.paused) this.resume()
+    this.emit()
   }
 
   private finish() {

@@ -63,6 +63,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const color = PHASE_COLORS[s.phase], color2 = PHASE_COLORS2[s.phase]
   const progress = Math.min(1, s.t / s.durationSec)
   const remaining = Math.max(0, s.durationSec - s.t)
+  const spans = engine.phaseSpans()
   const pat = BREATH_PATTERNS[s.breathPattern]
   const stepSec = s.breath === 'inhale' ? pat.inhale : s.breath === 'exhale' ? pat.exhale : s.breath === 'hold' ? pat.hold : pat.hold2
   const breathIntensity = s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.phase === 3 ? 0.7 : 0.4
@@ -118,8 +119,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       <div data-ui className="relative w-full px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] flex flex-col gap-3" style={ui} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
         {/* phase strip (tap to jump) */}
         <div className="flex gap-1 h-2.5 rounded-full overflow-hidden">
-          {engine.plan.phases.map((p) => {
-            const len = (p.endSec - p.startSec) / engine.plan.durationSec
+          {spans.map((p) => {
+            const len = (p.endSec - p.startSec) / s.durationSec
             const fill = Math.max(0, Math.min(1, (s.t - p.startSec) / (p.endSec - p.startSec)))
             return (
               <button key={p.n} onClick={() => engine.seekPhase(p.n as Phase)} style={{ flex: len }} className="relative h-full rounded-full overflow-hidden bg-white/10" title={PHASE_NAMES[p.n]}>
@@ -128,7 +129,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
             )
           })}
         </div>
-        <div className="flex justify-between text-[12px] opacity-70 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{engine.plan.phases.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
+        <div className="flex justify-between text-[12px] opacity-70 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{spans.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
 
         {/* track + transport */}
         <div className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(14,11,24,0.55)', border: '1px solid rgba(242,238,230,0.12)', backdropFilter: 'blur(14px)' }}>
