@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Mode } from '../db'
+import { Halo } from './Halo'
 
 const ALBUM_LINES = [
   'תפילות פסיכדליות. 55 שירים, מהכניסה ועד החזרה.',
@@ -29,12 +30,12 @@ export function PrepareScreen({ mode, onBegin, onCancel, loading }: { mode: Mode
       </div>
 
       <div className="relative w-full max-w-xs">
-        <div className="w-36 h-36 mx-auto mb-8 rounded-full aura" style={{ background: 'radial-gradient(circle at 40% 35%, #FFB3D9, #F062C0 35%, #9B6BFF 62%, transparent 76%)', boxShadow: '0 0 60px -10px #9B6BFF99' }} />
+        <Halo size={210} className="mx-auto mb-6" />
         <div className="text-[14px] opacity-80 mb-3">איך אתה מרגיש עכשיו?</div>
         <div className="flex justify-between">
           {[['1', 'כבד'], ['2', 'מתוח'], ['3', 'רגיל'], ['4', 'רגוע'], ['5', 'פתוח']].map(([n, l]) => (
             <button key={n} onClick={() => setMood(+n)} className="flex flex-col items-center gap-1">
-              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all duration-500 ${mood === +n ? 'border-[#F062C0] bg-[#F062C0]/20 font-semibold' : 'border-ink/15 opacity-85'}`}>{n}</span>
+              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all duration-500 ${mood === +n ? 'border-[#EBA17A] bg-[#EBA17A]/20 font-semibold' : 'border-ink/15 opacity-85'}`}>{n}</span>
               <span className="text-[12.5px] opacity-75">{l}</span>
             </button>
           ))}

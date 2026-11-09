@@ -86,7 +86,7 @@ export default function App() {
       </div>
       {updatedTo && (
         <div className="fade-in fixed z-30 top-[calc(env(safe-area-inset-top)+12px)] right-4 left-4 flex justify-center pointer-events-none">
-          <div className="sheet rounded-full px-5 py-2.5 text-[15px] font-medium flex items-center gap-2 shadow-[0_10px_30px_-12px_rgba(240,98,192,0.7)]">
+          <div className="sheet rounded-full px-5 py-2.5 text-[15px] font-medium flex items-center gap-2 shadow-[0_10px_30px_-12px_rgba(242,194,107,0.7)]">
             <span className="w-2 h-2 rounded-full" style={{ background: 'var(--grad)' }} />האפליקציה עודכנה · גרסה {updatedTo}
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function App() {
           const on = tab === k
           return (
             <button key={k} onClick={() => setTab(k)} className="flex flex-col items-center gap-1 px-3 py-1 transition-all duration-300" style={{ opacity: on ? 1 : 0.72 }}>
-              <span className="w-14 h-9 rounded-full flex items-center justify-center transition-all duration-300" style={{ background: on ? 'var(--grad)' : 'transparent', boxShadow: on ? '0 6px 20px -8px rgba(240,98,192,0.8)' : 'none' }}>
+              <span className="w-14 h-9 rounded-full flex items-center justify-center transition-all duration-300" style={{ background: on ? 'var(--grad)' : 'transparent', boxShadow: on ? '0 6px 20px -8px rgba(242,194,107,0.8)' : 'none' }}>
                 <NavIcon name={k} active={on} />
               </span>
               <span className="text-[12.5px]" style={{ fontWeight: on ? 600 : 500 }}>{l}</span>

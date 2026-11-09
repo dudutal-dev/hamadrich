@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type Album, type Mode, type Phase, db } from '../db'
+import { Halo } from './Halo'
 import { INTENTIONS, INTENTION_META, MODE_LONG, MODE_META, PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
 
 export interface StartChoice { mode: Mode; minutes: number; intention: string; voice: boolean; breath: boolean; albumId?: string; startTrackNo?: number; onlyPhases?: Phase[] }
 
 const MODE_ICON: Record<Mode, string> = { breath: '◌', meditation: '☾', deep: '✺', sleep: '☽', album: '♫' }
 const MODE_GRAD: Record<Mode, [string, string]> = {
-  breath: ['#19B8A6', '#2F5FE0'],
-  meditation: ['#7B2FD6', '#2F5FE0'],
-  deep: ['#FF5FC8', '#7B2FD6'],
+  breath: ['#7CCFBE', '#4F6FD6'],
+  meditation: ['#B3A4F2', '#5E6AD2'],
+  deep: ['#F2C26B', '#EBA17A'],
   sleep: ['#1B2A6B', '#0E0B18'],
-  album: ['#E8842E', '#FF5FC8'],
+  album: ['#EBA17A', '#B3A4F2'],
 }
 
 export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) {
@@ -37,9 +38,10 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
 
   return (
     <div className="fade-in flex flex-col gap-8 px-5 pt-12 pb-32">
-      <header>
-        <div className="text-[16px] muted">{greeting}</div>
-        <h1 className="text-[44px] title-psy leading-tight">המדריך</h1>
+      <header className="relative">
+        <Halo size={190} className="absolute -left-10 -top-12 opacity-90 pointer-events-none" />
+        <div className="relative text-[16px] muted">{greeting}</div>
+        <h1 className="relative text-[44px] title-psy leading-tight">המדריך</h1>
         <p className="opacity-80 text-[15px] mt-1">בחר מסע, כוונה ומשך. השאר קורה לבד.</p>
       </header>
 

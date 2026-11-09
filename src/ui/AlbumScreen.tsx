@@ -82,7 +82,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
 
   return (
     <div className="fade-in flex flex-col gap-6 px-5 pt-12 pb-32">
-      <header className="relative overflow-hidden rounded-3xl p-6" style={{ background: 'linear-gradient(135deg, #E8842E26, #F062C01F 50%, #9B6BFF26)', border: '1px solid rgba(240,98,192,0.35)', boxShadow: '0 18px 50px -28px #F062C0' }}>
+      <header className="relative overflow-hidden rounded-3xl p-6" style={{ background: 'linear-gradient(135deg, #E8842E26, #EBA17A1F 50%, #B3A4F226)', border: '1px solid rgba(242,194,107,0.35)', boxShadow: '0 18px 50px -28px #EBA17A' }}>
         <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full" style={{ background: 'radial-gradient(circle, #FFD08A44, transparent 70%)', filter: 'blur(24px)' }} />
         <div className="relative">
           <div className="text-[13px] tracking-[0.3em] opacity-80">פרק מיוחד · מסע מודרך בקול</div>

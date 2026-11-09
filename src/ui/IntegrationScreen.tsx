@@ -69,7 +69,7 @@ export function IntegrationScreen({ draft, onDone }: { draft: JournalEntry; onDo
         <div className="flex justify-between max-w-xs">
           {[['1', 'כבד'], ['2', 'מתוח'], ['3', 'רגיל'], ['4', 'רגוע'], ['5', 'פתוח']].map(([n, l]) => (
             <button key={n} onClick={() => setMood(+n)} className="flex flex-col items-center gap-1">
-              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all ${mood === +n ? 'border-[#F062C0] bg-[#F062C0]/20 font-semibold' : 'border-ink/15 opacity-85'}`}>{n}</span>
+              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all ${mood === +n ? 'border-[#EBA17A] bg-[#EBA17A]/20 font-semibold' : 'border-ink/15 opacity-85'}`}>{n}</span>
               <span className="text-[12.5px] opacity-75">{l}</span>
             </button>
           ))}

@@ -16,7 +16,7 @@ const rgba = (c: string, a: number) => { const [r, g, b] = hexToRgb(c); return `
 const mix = (a: string, b: string, t: number) => { const A = hexToRgb(a), B = hexToRgb(b); return `#${[0, 1, 2].map((i) => Math.round(A[i] + (B[i] - A[i]) * t).toString(16).padStart(2, '0')).join('')}` }
 
 /** Nebula palette like the reference: salmon/peach clouds, magenta, cyan streaks, hot white core — tinted toward the phase colors */
-const NEB = { peach: '#FF9A6B', rose: '#FF5FA8', magenta: '#F04CFF', cyan: '#39E6FF', violet: '#8A5CFF', gold: '#FFC857', coral: '#FF6F59' }
+const NEB = { peach: '#EBA17A', rose: '#B3A4F2', magenta: '#8E86E8', cyan: '#7CCFBE', violet: '#6F78E0', gold: '#F2C26B', coral: '#E39470' }
 
 export function Cosmos({ color, color2, intensity, phase, paused, ambient = false, levels }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -111,7 +111,7 @@ export function Cosmos({ color, color2, intensity, phase, paused, ambient = fals
       for (let i = 0; i < RAYS; i++) {
         const a = rot + (i / RAYS) * Math.PI * 2
         const wob = 0.55 + 0.45 * Math.sin(t * 0.9 + rayPhase[i] + mid * 4)
-        const base = ((peak ? 0.06 : 0.045) * wob + pulse * 0.035) * (s.ambient ? 0.8 : 1)
+        const base = ((peak ? 0.042 : 0.03) * wob + pulse * 0.03) * (s.ambient ? 0.8 : 1)
         const spread = 0.012 + 0.012 * wob + bass * 0.01
         const edge = i % 3 === 0 ? NEB.cyan : i % 3 === 1 ? NEB.rose : NEB.gold
         const ex = Math.cos(a) * rayLen, ey = Math.sin(a) * rayLen
