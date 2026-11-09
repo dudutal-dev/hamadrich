@@ -3,18 +3,23 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
+import { checkForUpdate, reloadIntoUpdate } from './version'
 
-// auto-update: when a new version is deployed, activate it and reload (never during a running journey)
-const updateSW = registerSW({
+// Auto-update: a new deployment installs in the background and activates by itself.
+// The page then reloads into it – but never in the middle of a journey (waits until the journey ends).
+registerSW({
   immediate: true,
-  onNeedRefresh() {
-    const inJourney = document.body.dataset.journey === '1'
-    if (inJourney) { window.addEventListener('hamadrich:idle', () => updateSW(true), { once: true }) } else { void updateSW(true) }
+  onNeedReload() {
+    if (document.body.dataset.journey === '1') window.addEventListener('hamadrich:idle', reloadIntoUpdate, { once: true })
+    else reloadIntoUpdate()
+  },
+  onRegisteredSW(_url, r) {
+    if (r) setInterval(() => { if (document.visibilityState === 'visible') void r.update() }, 30 * 60 * 1000)
   },
 })
-// also check for updates whenever the app comes back to the foreground
+// look for updates every time the app is opened / comes back to the foreground
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') navigator.serviceWorker?.getRegistration().then((r) => r?.update())
+  if (document.visibilityState === 'visible') void checkForUpdate()
 })
 
 createRoot(document.getElementById('root')!).render(

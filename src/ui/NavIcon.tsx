@@ -1,6 +1,6 @@
 export function NavIcon({ name, active }: { name: 'journey' | 'album' | 'journal' | 'library'; active: boolean }) {
-  const c = active ? '#0E0B18' : '#F2EEE6'
-  const common = { fill: 'none', stroke: c, strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  const c = active ? '#140F22' : '#F2EEE6'
+  const common = { fill: 'none', stroke: c, strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   switch (name) {
     case 'journey': // orb with rays
       return (

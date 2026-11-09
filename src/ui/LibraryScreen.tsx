@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { type Album, type Asset, type Phase, type Settings, type TextItem, db, getSettings, uid } from '../db'
 import { deleteAlbum, importAlbum, importMusic, saveVoiceRecording, startRecording, synthesizeVoice } from '../engine/library'
 import { PHASE_NAMES } from '../engine/plan'
+import { checkForUpdate, versionLabel } from '../version'
 
 type Tab = 'texts' | 'music' | 'settings'
 
@@ -9,10 +10,10 @@ export function LibraryScreen() {
   const [tab, setTab] = useState<Tab>('texts')
   return (
     <div className="fade-in flex flex-col gap-5 px-5 pt-10 pb-28">
-      <h1 className="text-[34px] font-normal title-psy">ספרייה</h1>
-      <div className="flex gap-5 text-[15px] border-b border-ink/10">
+      <h1 className="text-[34px] title-psy">ספרייה</h1>
+      <div className="flex gap-1 p-1 rounded-full chip text-[15px]">
         {(['texts', 'music', 'settings'] as Tab[]).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`pb-2 -mb-px border-b transition-all ${tab === t ? 'border-ink/70' : 'border-transparent opacity-70'}`}>{{ texts: 'טקסטים', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
+          <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-full transition-all ${tab === t ? 'btn-psy' : 'opacity-85'}`}>{{ texts: 'טקסטים', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
         ))}
       </div>
       {tab === 'texts' && <Texts />}
@@ -49,23 +50,23 @@ function Texts() {
   const missing = texts.filter((t) => !t.voiceAssetId).length
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex justify-between items-center text-[13px] opacity-75">
+      <div className="flex justify-between items-center text-[14px] opacity-85">
         <span>{texts.length} טקסטים · {missing} ללא קול</span>
         <div className="flex gap-4">
           {missing > 0 && <button onClick={synthAll} disabled={!!busy}>הפק קול לכולם</button>}
           <button onClick={() => setEdit({ id: uid(), title: '', body: '', source: 'שלי', phases: [2], intentions: [], estSec: 20, createdAt: new Date().toISOString() })}>+ חדש</button>
         </div>
       </div>
-      {msg && <div className="text-[13px] text-amber-200/80">{msg}</div>}
+      {msg && <div className="text-[14px] text-amber-200/80">{msg}</div>}
       {texts.map((t) => (
         <div key={t.id} className="card rounded-2xl p-4">
           <div className="flex justify-between">
-            <div className="text-[17px]">{t.title}</div>
-            <div className="text-[13px] opacity-70">{t.phases.map((p) => PHASE_NAMES[p]).join(' · ')}</div>
+            <div className="text-[18px] font-semibold">{t.title}</div>
+            <div className="text-[14px] opacity-80">{t.phases.map((p) => PHASE_NAMES[p]).join(' · ')}</div>
           </div>
-          <p className="text-[15px] opacity-70 leading-relaxed mt-2 line-clamp-2">{t.body}</p>
-          <div className="flex gap-4 text-[13px] mt-3 opacity-70">
-            {t.voiceAssetId ? <button onClick={() => play(t)}>▶ האזן</button> : <span className="opacity-75">אין קול</span>}
+          <p className="text-[15px] opacity-80 leading-relaxed mt-2 line-clamp-2">{t.body}</p>
+          <div className="flex gap-4 text-[14px] mt-3 opacity-80">
+            {t.voiceAssetId ? <button onClick={() => play(t)}>▶ האזן</button> : <span className="opacity-85">אין קול</span>}
             <button onClick={() => synth(t)} disabled={busy === t.id}>{busy === t.id ? 'מפיק…' : t.voiceAssetId ? 'הפק מחדש' : 'הפק קריינות'}</button>
             <RecordButton text={t} onDone={reload} />
             <button onClick={() => setEdit(t)}>ערוך</button>
@@ -95,15 +96,15 @@ function TextEditor({ item, onClose }: { item: TextItem; onClose: () => void }) 
     <div className="fixed inset-0 bg-bg/95 z-50 flex flex-col gap-4 px-5 pt-12 pb-8 overflow-y-auto">
       <input value={t.title} onChange={(e) => setT({ ...t, title: e.target.value })} placeholder="כותרת" className="bg-transparent border-b border-ink/15 py-2 text-[20px] outline-none" />
       <textarea value={t.body} onChange={(e) => setT({ ...t, body: e.target.value })} placeholder="הטקסט, כפי שייאמר…" rows={8} className="bg-transparent border border-ink/12 rounded-xl p-3 text-[17px] leading-relaxed outline-none resize-none" />
-      <div className="text-[13px] opacity-70">שלבים</div>
+      <div className="text-[14px] opacity-80">שלבים</div>
       <div className="flex flex-wrap gap-2">
-        {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => togglePhase(p)} className={`px-3 py-1.5 rounded-full border text-[13px] ${t.phases.includes(p) ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-75'}`}>{PHASE_NAMES[p]}</button>)}
+        {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => togglePhase(p)} className={`px-3 py-1.5 rounded-full border text-[14px] ${t.phases.includes(p) ? 'chip-on' : 'chip'}`}>{PHASE_NAMES[p]}</button>)}
       </div>
       <input value={t.intentions.join(', ')} onChange={(e) => setT({ ...t, intentions: e.target.value.split(/[,\s]+/).filter(Boolean) })} placeholder="כוונות (שקט, ריפוי…)" className="bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none" />
       <input value={t.source} onChange={(e) => setT({ ...t, source: e.target.value })} placeholder="מקור" className="bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none" />
       <div className="mt-auto flex flex-col gap-3">
         <button onClick={save} className="rounded-2xl py-4 bg-ink text-bg text-[17px]">שמור</button>
-        <div className="flex justify-between text-[15px] opacity-75"><button onClick={onClose}>ביטול</button><button onClick={del}>מחק</button></div>
+        <div className="flex justify-between text-[15px] opacity-85"><button onClick={onClose}>ביטול</button><button onClick={del}>מחק</button></div>
       </div>
     </div>
   )
@@ -119,10 +120,8 @@ function Music() {
   const looseInput = useRef<HTMLInputElement>(null)
   const [loosePhases, setLoosePhases] = useState<Phase[]>([3])
 
-  const reload = async () => {
-    setAlbums(await db.albums.toArray())
-    setLoose((await db.assets.where('kind').equals('music').toArray()).filter((a) => !a.albumId))
-  }
+  const reload = () => Promise.all([db.albums.toArray(), db.assets.where('kind').equals('music').toArray()])
+    .then(([al, music]) => { setAlbums(al); setLoose(music.filter((a) => !a.albumId)) })
   useEffect(() => { void reload() }, [])
 
   const onAlbum = async (files: FileList | null) => {
@@ -139,40 +138,46 @@ function Music() {
   return (
     <div className="flex flex-col gap-5">
       <section className="card rounded-2xl p-4 flex flex-col gap-3">
-        <div className="text-[17px]">אלבום כמסע</div>
-        <p className="text-[13px] opacity-75 leading-relaxed">בחר את קובץ ה-ZIP שהורדת מ-Bandcamp (או את כל ה-MP3 בבת אחת). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
+        <div className="text-[18px] font-semibold">אלבום כמסע</div>
+        <p className="text-[14px] opacity-85 leading-relaxed">בחר את קובץ ה-ZIP שהורדת מ-Bandcamp (או את כל ה-MP3 בבת אחת). הסדר נקבע לפי מספר הרצועה בשם הקובץ, והשלבים ממופים אוטומטית.</p>
         <input value={albumName} onChange={(e) => setAlbumName(e.target.value)} className="bg-transparent border-b border-ink/15 py-1 text-[15px] outline-none" />
         <input ref={albumInput} type="file" accept="audio/*,.zip,application/zip" multiple hidden onChange={(e) => onAlbum(e.target.files)} />
-        <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 border border-ink/25 text-[15px]">בחר ZIP או קבצים</button>
+        <button onClick={() => albumInput.current?.click()} className="rounded-xl py-3 btn-ghost text-[15px]">בחר ZIP או קבצים</button>
         {albums.map((a) => (
           <div key={a.id} className="flex justify-between items-center text-[15px] pt-2 border-t border-ink/10">
             <span>{a.name} · {a.trackCount} רצועות · {Math.round(a.totalSec / 60)} דק'</span>
-            <button onClick={() => { if (confirm('למחוק את האלבום מהאפליקציה?')) void deleteAlbum(a.id).then(reload) }} className="text-[13px] opacity-70">מחק</button>
+            <button onClick={() => { if (confirm('למחוק את האלבום מהאפליקציה?')) void deleteAlbum(a.id).then(reload) }} className="text-[14px] opacity-80">מחק</button>
           </div>
         ))}
       </section>
 
       <section className="card rounded-2xl p-4 flex flex-col gap-3">
-        <div className="text-[17px]">רצועות אמביינט לשלבים</div>
-        <p className="text-[13px] opacity-75 leading-relaxed">קבצים בודדים לשימוש במצבי נשימה/מדיטציה/מסע. בלי קבצים האפליקציה מנגנת דרון מובנה.</p>
+        <div className="text-[18px] font-semibold">רצועות אמביינט לשלבים</div>
+        <p className="text-[14px] opacity-85 leading-relaxed">קבצים בודדים לשימוש במצבי נשימה/מדיטציה/מסע. בלי קבצים האפליקציה מנגנת דרון מובנה.</p>
         <div className="flex flex-wrap gap-2">
-          {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => setLoosePhases(loosePhases.includes(p) ? loosePhases.filter((x) => x !== p) : [...loosePhases, p].sort())} className={`px-3 py-1.5 rounded-full border text-[13px] ${loosePhases.includes(p) ? 'border-ink/70 bg-ink/10' : 'border-ink/12 opacity-75'}`}>{PHASE_NAMES[p]}</button>)}
+          {([1, 2, 3, 4, 5] as Phase[]).map((p) => <button key={p} onClick={() => setLoosePhases(loosePhases.includes(p) ? loosePhases.filter((x) => x !== p) : [...loosePhases, p].sort())} className={`px-3 py-1.5 rounded-full border text-[14px] ${loosePhases.includes(p) ? 'chip-on' : 'chip'}`}>{PHASE_NAMES[p]}</button>)}
         </div>
         <input ref={looseInput} type="file" accept="audio/*" multiple hidden onChange={(e) => onLoose(e.target.files)} />
-        <button onClick={() => looseInput.current?.click()} className="rounded-xl py-3 border border-ink/25 text-[15px]">הוסף קבצים לשלבים שנבחרו</button>
+        <button onClick={() => looseInput.current?.click()} className="rounded-xl py-3 btn-ghost text-[15px]">הוסף קבצים לשלבים שנבחרו</button>
         {loose.map((a) => (
           <div key={a.id} className="flex justify-between items-center text-[15px] pt-2 border-t border-ink/10">
-            <span className="truncate ml-3">{a.name} <span className="opacity-70 text-[13px]">· {a.phases.map((p) => PHASE_NAMES[p]).join('/')} · {Math.round(a.durationSec / 60)} דק'</span></span>
-            <button onClick={() => void db.assets.delete(a.id).then(reload)} className="text-[13px] opacity-70">מחק</button>
+            <span className="truncate ml-3">{a.name} <span className="opacity-80 text-[14px]">· {a.phases.map((p) => PHASE_NAMES[p]).join('/')} · {Math.round(a.durationSec / 60)} דק'</span></span>
+            <button onClick={() => void db.assets.delete(a.id).then(reload)} className="text-[14px] opacity-80">מחק</button>
           </div>
         ))}
       </section>
-      {busy && <div className="text-[13px] opacity-70">{busy}</div>}
+      {busy && <div className="text-[14px] opacity-80">{busy}</div>}
     </div>
   )
 }
 
 /* ---------- Settings ---------- */
+function GainSlider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="flex flex-col gap-1 text-[15px]"><span className="opacity-80">{label}</span><input type="range" min={0} max={1} step={0.05} value={value} onChange={(e) => onChange(+e.target.value)} /></label>
+  )
+}
+
 function SettingsPane() {
   const [s, setS] = useState<Settings | null>(null)
   const [voices, setVoices] = useState<Array<{ voice_id: string; name: string }>>([])
@@ -184,17 +189,14 @@ function SettingsPane() {
     const r = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': s.elevenKey } })
     if (r.ok) setVoices((await r.json()).voices)
   }
-  const Slider = ({ k, label }: { k: 'musicGain' | 'voiceGain' | 'breathGain'; label: string }) => (
-    <label className="flex flex-col gap-1 text-[15px]"><span className="opacity-70">{label}</span><input type="range" min={0} max={1} step={0.05} value={s[k]} onChange={(e) => save({ [k]: +e.target.value })} /></label>
-  )
   return (
     <div className="flex flex-col gap-6 text-[15px]">
       <section className="flex flex-col gap-3">
-        <div className="text-[17px]">קול (ElevenLabs)</div>
+        <div className="text-[18px] font-semibold">קול (ElevenLabs)</div>
         <input type="password" value={s.elevenKey ?? ''} onChange={(e) => save({ elevenKey: e.target.value })} placeholder="מפתח API" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
         <div className="flex gap-3 items-center">
           <input value={s.voiceId ?? ''} onChange={(e) => save({ voiceId: e.target.value })} placeholder="Voice ID" className="flex-1 bg-transparent border-b border-ink/15 py-2 outline-none" />
-          <button onClick={loadVoices} className="text-[13px] opacity-75">טען קולות</button>
+          <button onClick={loadVoices} className="text-[14px] opacity-85">טען קולות</button>
         </div>
         {voices.length > 0 && (
           <select value={s.voiceId ?? ''} onChange={(e) => save({ voiceId: e.target.value })} className="bg-bg border border-ink/15 rounded-lg p-2">
@@ -202,32 +204,57 @@ function SettingsPane() {
             {voices.map((v) => <option key={v.voice_id} value={v.voice_id}>{v.name}</option>)}
           </select>
         )}
-        <p className="text-[13px] opacity-70">המפתח נשמר רק במכשיר הזה. הפקת קול דורשת רשת; המסע עצמו לא.</p>
+        <p className="text-[14px] opacity-80">המפתח נשמר רק במכשיר הזה. הפקת קול דורשת רשת; המסע עצמו לא.</p>
       </section>
       <section className="flex flex-col gap-3">
-        <div className="text-[17px]">פלט</div>
+        <div className="text-[18px] font-semibold">פלט</div>
         <div className="grid grid-cols-2 gap-2">
           {(['speakers', 'headphones'] as const).map((o) => (
-            <button key={o} onClick={() => save({ output: o })} className={`rounded-xl py-3 border transition-all ${s.output === o ? 'border-[#FF5FC8] bg-[#FF5FC8]/20' : 'border-ink/20 opacity-75'}`}>{o === 'speakers' ? 'רמקולים' : 'אוזניות'}</button>
+            <button key={o} onClick={() => save({ output: o })} className={`rounded-xl py-3 border transition-all ${s.output === o ? 'chip-on' : 'chip'}`}>{o === 'speakers' ? 'רמקולים' : 'אוזניות'}</button>
           ))}
         </div>
-        <p className="text-[13px] opacity-70">רמקולים: הדרון מכוון גבוה יותר כדי שיישמע בטלפון. אוזניות: מוסיף תת-אוקטבה ושכבה ביניאורלית (תטא בשיא).</p>
+        <p className="text-[14px] opacity-80">רמקולים: הדרון מכוון גבוה יותר כדי שיישמע בטלפון. אוזניות: מוסיף תת-אוקטבה ושכבה ביניאורלית (תטא בשיא).</p>
         {s.output === 'headphones' && <label className="flex items-center justify-between"><span>שכבה ביניאורלית</span><input type="checkbox" checked={s.binaural} onChange={(e) => save({ binaural: e.target.checked })} /></label>}
       </section>
       <section className="flex flex-col gap-3">
-        <div className="text-[17px]">עוצמות</div>
-        <Slider k="musicGain" label="מוזיקה" /><Slider k="voiceGain" label="קריינות" /><Slider k="breathGain" label="צלילי נשימה" />
+        <div className="text-[18px] font-semibold">עוצמות</div>
+        {([['musicGain', 'מוזיקה'], ['voiceGain', 'קריינות'], ['breathGain', 'צלילי נשימה']] as const).map(([k, label]) => (
+          <GainSlider key={k} label={label} value={s[k]} onChange={(v) => save({ [k]: v })} />
+        ))}
         <label className="flex items-center justify-between"><span>רטט בנשימה</span><input type="checkbox" checked={s.haptics} onChange={(e) => save({ haptics: e.target.checked })} /></label>
       </section>
       <section className="flex flex-col gap-3">
-        <div className="text-[17px]">איש קשר לחירום</div>
+        <div className="text-[18px] font-semibold">איש קשר לחירום</div>
         <input value={s.emergencyName ?? ''} onChange={(e) => save({ emergencyName: e.target.value })} placeholder="שם" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
         <input value={s.emergencyPhone ?? ''} onChange={(e) => save({ emergencyPhone: e.target.value })} placeholder="טלפון" inputMode="tel" className="bg-transparent border-b border-ink/15 py-2 outline-none" />
-        <p className="text-[13px] opacity-70">מופיע כקיצור במסך החירום (לחיצה ארוכה 3 שניות בזמן מסע).</p>
+        <p className="text-[14px] opacity-80">מופיע כקיצור במסך החירום (לחיצה ארוכה 3 שניות בזמן מסע).</p>
       </section>
-      <section className="text-[13px] opacity-70 leading-relaxed">
+      <section className="text-[14px] opacity-80 leading-relaxed">
         המדריך מלווה נשימה, מדיטציה ומסעות עצמאיים. הוא אינו כלי רפואי ואינו מחליף ליווי אנושי. הכל נשמר במכשיר בלבד.
       </section>
+      <VersionInfo />
     </div>
+  )
+}
+
+function VersionInfo() {
+  const [state, setState] = useState<'idle' | 'checking' | 'latest'>('idle')
+  const check = async () => {
+    setState('checking')
+    try { await checkForUpdate() } catch { /* offline */ }
+    // if a newer version exists it installs and the app reloads by itself; otherwise we're current
+    setTimeout(() => setState('latest'), 4000)
+  }
+  return (
+    <section className="card rounded-2xl p-4 flex items-center justify-between gap-3">
+      <div>
+        <div className="label">גרסה</div>
+        <div className="text-[15px] font-medium tabular-nums mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{versionLabel()}</div>
+        <div className="text-[13px] muted mt-0.5">עדכונים נטענים אוטומטית בפתיחת האפליקציה</div>
+      </div>
+      <button onClick={check} disabled={state === 'checking'} className="btn-ghost rounded-full px-4 py-2 text-[14px] shrink-0">
+        {state === 'checking' ? 'בודק…' : state === 'latest' ? '✓ עדכני' : 'בדוק עכשיו'}
+      </button>
+    </section>
   )
 }

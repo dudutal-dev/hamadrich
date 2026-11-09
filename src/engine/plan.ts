@@ -13,14 +13,14 @@ export const PHASE_NAMES: Record<Phase, string> = {
 export const PHASE_COLORS: Record<Phase, string> = {
   1: '#2F5FE0', // הגעה – כחול חשמלי
   2: '#19B8A6', // שחרור – טורקיז
-  3: '#7B2FD6', // שיא – סגול
+  3: '#5B4BC4', // שיא – אינדיגו
   4: '#E8842E', // חזרה – כתום-ענבר
   5: '#E3B341', // אינטגרציה – זהב
 }
 export const PHASE_COLORS2: Record<Phase, string> = {
   1: '#8FD3FF',
   2: '#9FF5D8',
-  3: '#FF5FC8',
+  3: '#C9BBFF',
   4: '#FFD08A',
   5: '#FFF2B8',
 }
