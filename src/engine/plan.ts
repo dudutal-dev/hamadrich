@@ -360,7 +360,8 @@ function buildAlbumPlan(input: BuildInput): SessionPlan {
 }
 
 /** the Psychedelic Prayers album (55 tracks): has its own phase map, breath map and texts */
-export const isPsychedelicPrayers = (a: Pick<Album, 'name' | 'trackCount'>) => a.trackCount === 55 && /psychedelic\s*prayers|תפילות/i.test(a.name)
+export const isPsychedelicPrayers = (a: Pick<Album, 'name' | 'trackCount'> & { totalSec?: number }) =>
+  a.trackCount === 55 && (/psychedelic\s*prayers|תפילות/i.test(a.name) || Math.abs((a.totalSec ?? 0) - 5638) < 20) // by name, or by its exact length (any file name)
 
 /** default phase map: Psychedelic Prayers' known chapters, otherwise split by cumulative listening time (deep-journey shares) */
 export function defaultAlbumPhaseMap(trackCount: number, durations?: number[]): Record<number, Phase> {
