@@ -47,10 +47,9 @@ input, textarea, select, button { font-family: inherit; }
 input, textarea { user-select: text; -webkit-user-select: text; }
 
 html { background: var(--color-bg); }
-#root {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-}
+/* safe areas (notch / Dynamic Island / home bar) are handled by each screen exactly once – not here,
+   otherwise full-screen views (journey) get them twice and are pushed down + cut off at the bottom */
+#root { padding: 0; }
 
 * { transition-timing-function: var(--ease-soft); }
 

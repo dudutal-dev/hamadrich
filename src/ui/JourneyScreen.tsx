@@ -5,6 +5,8 @@ import { PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import { Cosmos } from './Cosmos'
 import { Orb } from './Orb'
 import { CastSheet } from './CastSheet'
+import { CoupleFigures } from './CoupleFigures'
+import { bodyJourney } from '../engine/body'
 import { g, useAddress } from '../address'
 
 const BREATH_WORD = { inhale: 'שאיפה', hold: 'החזק', exhale: 'נשיפה', hold2: 'החזק', none: '' } as const
@@ -29,6 +31,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const orbCenter = () => { const r = orbRef.current?.getBoundingClientRect(); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }
   const endedRef = useRef(false)
   const isAlbum = engine.plan.mode === 'album'
+  const isCouple = bodyJourney(engine.plan.journey)?.level === 3
   const a = useAddress()
 
   useEffect(() => { const off = engine.on(setS); return () => { off() } }, [engine])
@@ -79,7 +82,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const stepSec = s.breath === 'inhale' ? pat.inhale : s.breath === 'exhale' ? pat.exhale : s.breath === 'hold' ? pat.hold : pat.hold2
   const breathIntensity = s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.phase === 3 ? 0.7 : 0.4
   const peak = s.phase === 3 && !s.paused
-  const dimAll = peak && !awake && !tv
+  const dimAll = peak && !awake && !tv && !isCouple // couples need the turn label even in the quiet peak
   const ui = { opacity: awake ? 1 : tv ? 0 : 0.6, transition: 'opacity 1200ms', pointerEvents: (tv && !awake ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] }
   const landscape = vp.w > vp.h
   const compact = landscape && !tv // phone rotated by accident (e.g. lying down): keep everything on screen
@@ -121,7 +124,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
 
       {/* center */}
       <div className={`relative flex-1 flex ${tv && landscape ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${tv ? 'justify-center' : 'justify-start pt-6'}`}>
-        <div ref={orbRef}><Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} /></div>
+        <div ref={orbRef}>{isCouple
+          ? <CoupleFigures label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: Math.round(Math.min(vp.w * 0.96, orbSize * 1.6)), h: Math.round(orbSize * 1.15) }}
+              breath={s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.breath === 'hold2' ? 0 : -1} />
+          : <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} />}</div>
         <div className={`${tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
           {s.label && <div key={s.label} className="fade-in text-[clamp(20px,4.5vmin,44px)] font-semibold mb-3 text-center px-4" style={{ color: color2, textShadow: `0 0 24px ${color}` }}>{s.label}</div>}
           {s.breath !== 'none' && !s.paused ? (

@@ -91,7 +91,7 @@ export default function App() {
   if (stage === 'integration' && draft) return <IntegrationScreen draft={draft} question={bodyJourney(plan?.journey)?.question} onDone={reset} />
 
   return (
-    <div className="h-full overflow-y-auto relative isolate">
+    <div className="h-full overflow-y-auto relative isolate pt-[env(safe-area-inset-top)]">
       <div className="app-bg"><i /></div>
       <div className="relative z-10">
         {tab === 'journey' && <StartScreen onStart={onStart} />}
