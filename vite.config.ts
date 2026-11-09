@@ -11,8 +11,8 @@ const sha = (process.env.GITHUB_SHA ?? (() => { try { return execSync('git rev-p
 export default defineConfig({
   base: './',
   define: {
-    // built-in media (voice, breath, music) – downloaded after install, file by file, into a permanent cache
-    __MEDIA__: JSON.stringify(['voice', 'breath', 'music'].flatMap((d) => readdirSync(`public/${d}`).filter((f) => f.endsWith('.mp3')).map((f) => `${d}/${f}`))),
+    // built-in media (voice, breath, music, couple illustrations) – downloaded after install, file by file, into a permanent cache
+    __MEDIA__: JSON.stringify(['voice', 'breath', 'music', 'couple'].flatMap((d) => readdirSync(`public/${d}`).filter((f) => /\.(mp3|webp)$/.test(f)).map((f) => `${d}/${f}`))),
     __APP_VERSION__: JSON.stringify(sha),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
@@ -44,7 +44,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         cleanupOutdatedCaches: true,
         runtimeCaching: [{
-          urlPattern: /\/(voice|breath|music)\/[^/]+\.mp3$/,
+          urlPattern: /\/(voice|breath|music|couple)\/[^/]+\.(mp3|webp)$/,
           handler: 'CacheFirst',
           options: { cacheName: 'hamadrich-media', rangeRequests: true, cacheableResponse: { statuses: [0, 200] } },
         }],
