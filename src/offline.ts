@@ -1,4 +1,4 @@
-/** Built-in media (voice, breath, music ≈ 45 MB) lives in a permanent cache, filled file by file in the background.
+/** Built-in media (voice, breath, music, couple illustrations ≈ 53 MB) lives in a permanent cache, filled file by file in the background.
  *  The service-worker update stays tiny (app shell only), so updates install reliably even on 4G;
  *  a failed file is simply retried next time. The same cache serves the files offline (CacheFirst in the SW). */
 export const MEDIA_CACHE = 'hamadrich-media'
