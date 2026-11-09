@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Phase, Settings } from '../db'
+import type { Settings } from '../db'
 import { type EngineState, type SessionEngine, BREATH_PATTERNS } from '../engine/audio'
 import { PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import { Cosmos } from './Cosmos'
@@ -18,6 +18,9 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const [emergency, setEmergency] = useState(false)
   const [confirmExit, setConfirmExit] = useState(false)
   const [awake, setAwake] = useState(true)
+  // couple video in landscape: a tap hides every caption and control (clean view), another tap brings them back
+  const [clean, setClean] = useState(false)
+  const [scrub, setScrub] = useState<number | null>(null) // 0..1 while dragging the progress bar
   const [hint, setHint] = useState(true)
   const [tv, setTvState] = useState(() => { try { return localStorage.getItem('hamadrich:tv') === '1' } catch { return false } })
   const setTv = (v: boolean) => { setTvState(v); try { localStorage.setItem('hamadrich:tv', v ? '1' : '0') } catch { /* */ } }
@@ -67,10 +70,13 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     const held = Date.now() - pressStart.current; pressStart.current = 0
     const dy = touchY.current - e.clientY
     if (emergency || confirmExit) return
+    const cleanable = isCouple && vp.w > vp.h && Math.abs(dy) < 90 && held < 700
+    if (cleanable && clean) { setClean(false); return }
     if (wasAsleep.current && held < 700 && Math.abs(dy) < 90) { wasAsleep.current = false; return }
     if (dy > 90) { engine.skipToReturn(); flash('מדלג לחזרה'); return }
     if (held >= 3000) { setEmergency(true); engine.calm(); return }
     if (held >= 700) { engine.extend(600); flash('עוד עשר דקות'); return }
+    if (cleanable) { setClean(true); flash('תצוגה נקייה · הקשה מחזירה'); return }
     if (s.paused) { engine.resume(); flash('ממשיכים') } else { engine.pause(); flash('עצירה') }
   }
 
@@ -83,7 +89,10 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const breathIntensity = s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.phase === 3 ? 0.7 : 0.4
   const peak = s.phase === 3 && !s.paused
   const dimAll = peak && !awake && !tv && !isCouple // couples need the turn label even in the quiet peak
-  const ui = { opacity: awake ? 1 : tv ? 0 : 0.6, transition: 'opacity 1200ms', pointerEvents: (tv && !awake ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] }
+  // RTL bar: time runs from right to left
+  const scrubFrac = (e: React.PointerEvent<HTMLElement>) => { const r = e.currentTarget.getBoundingClientRect(); return Math.max(0, Math.min(1, (r.right - e.clientX) / r.width)) }
+  const shownT = scrub !== null ? scrub * s.durationSec : s.t
+  const ui = clean ? { opacity: 0, transition: 'opacity 600ms', pointerEvents: 'none' as React.CSSProperties['pointerEvents'] } : { opacity: awake ? 1 : tv ? 0 : 0.6, transition: 'opacity 1200ms', pointerEvents: (tv && !awake ? 'none' : 'auto') as React.CSSProperties['pointerEvents'] }
   const landscape = vp.w > vp.h
   const compact = landscape && !tv // phone rotated by accident (e.g. lying down): keep everything on screen
   const orbSize = Math.round(tv ? Math.min(vp.w, vp.h) * (landscape ? 0.66 : 0.72) : compact ? Math.min(220, vp.h * 0.45) : Math.min(290, vp.h * 0.38, vp.w * 0.78))
@@ -109,7 +118,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       {isCouple && landscape && <>
         {/* landscape / TV: the couple fills the screen; a soft shade at the bottom keeps the turn label readable */}
         <CoupleFigures mode="fill" label={s.label} paused={s.paused} levels={() => engine.levels()} />
-        <div className="absolute inset-x-0 bottom-0 h-[38%] pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(7,5,16,0.85), transparent)' }} />
+        <div className="absolute inset-x-0 bottom-0 h-[38%] pointer-events-none" style={{ opacity: clean ? 0 : 1, transition: 'opacity 600ms', background: 'linear-gradient(to top, rgba(7,5,16,0.85), transparent)' }} />
       </>}
 
       {/* top bar */}
@@ -132,7 +141,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
         <div ref={orbRef}>{isCouple
           ? (landscape ? null : <CoupleFigures mode="box" label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: vp.w, h: Math.round(Math.min(vp.h * (tv ? 0.62 : 0.56), vp.w * 1.25)) }} />)
           : <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} />}</div>
-        <div className={`${isCouple ? (landscape ? '' : 'mt-3') : tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
+        <div className={`${isCouple ? (landscape ? '' : 'mt-3') : tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll || clean ? 0 : 1, transition: `opacity ${clean ? 600 : 1200}ms` }}>
           {s.label && <div key={s.label} className="fade-in text-[clamp(20px,4.5vmin,44px)] font-semibold mb-3 text-center px-4" style={{ color: color2, textShadow: `0 0 24px ${color}` }}>{s.label}</div>}
           {s.breath !== 'none' && !s.paused ? (
             <>
@@ -154,19 +163,26 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
 
       {/* player */}
       {!tv && <div data-ui className="relative w-full px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] flex flex-col gap-3" style={ui} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-        {/* phase strip (tap to jump) */}
-        <div className="flex gap-1 h-2.5 rounded-full overflow-hidden">
-          {spans.map((p) => {
-            const len = (p.endSec - p.startSec) / s.durationSec
-            const fill = Math.max(0, Math.min(1, (s.t - p.startSec) / (p.endSec - p.startSec)))
-            return (
-              <button key={p.n} onClick={() => engine.seekPhase(p.n as Phase)} style={{ flex: len }} className="relative h-full rounded-full overflow-hidden bg-white/10" title={PHASE_NAMES[p.n]}>
-                <div className="absolute inset-y-0 right-0" style={{ width: `${fill * 100}%`, background: `linear-gradient(90deg, ${PHASE_COLORS[p.n]}, ${PHASE_COLORS2[p.n]})` }} />
-              </button>
-            )
-          })}
+        {/* progress bar: drag (or tap) anywhere to move forward / back; tall invisible hit area for fingers */}
+        <div className="relative py-3 -my-3 cursor-pointer touch-none"
+          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setScrub(scrubFrac(e)) }}
+          onPointerMove={(e) => { if (scrub !== null) setScrub(scrubFrac(e)) }}
+          onPointerUp={(e) => { if (scrub === null) return; const f = scrubFrac(e); setScrub(null); engine.seekTo(f * s.durationSec) }}
+          onPointerCancel={() => setScrub(null)}>
+          <div className="flex gap-1 h-2.5 rounded-full overflow-hidden" style={{ transform: scrub !== null ? 'scaleY(1.6)' : 'none', transition: 'transform 150ms' }}>
+            {spans.map((p) => {
+              const len = (p.endSec - p.startSec) / s.durationSec
+              const fill = Math.max(0, Math.min(1, (shownT - p.startSec) / (p.endSec - p.startSec)))
+              return (
+                <div key={p.n} style={{ flex: len }} className="relative h-full rounded-full overflow-hidden bg-white/10" title={PHASE_NAMES[p.n]}>
+                  <div className="absolute inset-y-0 right-0" style={{ width: `${fill * 100}%`, background: `linear-gradient(90deg, ${PHASE_COLORS[p.n]}, ${PHASE_COLORS2[p.n]})` }} />
+                </div>
+              )
+            })}
+          </div>
+          <div className="absolute top-1/2 w-5 h-5 -mt-2.5 rounded-full bg-ink pointer-events-none" style={{ right: `calc(${(shownT / s.durationSec) * 100}% - 10px)`, boxShadow: `0 0 0 4px ${color}55, 0 2px 8px rgba(0,0,0,0.5)`, opacity: scrub !== null ? 1 : 0.85 }} />
         </div>
-        <div className="flex justify-between text-[13px] opacity-80 tabular-nums -mt-1"><span>{fmt(s.t)}</span><span>{spans.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(remaining)}</span></div>
+        <div className="flex justify-between text-[13px] opacity-80 tabular-nums -mt-1"><span>{fmt(shownT)}</span><span>{spans.map((p) => PHASE_NAMES[p.n]).join(' · ')}</span><span>-{fmt(Math.max(0, s.durationSec - shownT))}</span></div>
 
         {/* track + transport */}
         {!compact && <><div className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(14,11,24,0.55)', border: '1px solid rgba(242,238,230,0.12)', backdropFilter: 'blur(14px)' }}>

@@ -655,6 +655,12 @@ export class SessionEngine {
     this.emit()
   }
 
+  /** jump to a point on the session timeline (seconds, as shown in the player) */
+  seekTo(sessionT: number) {
+    const total = this.toSession(this.plan.durationSec)
+    this.seek(this.toPlan(Math.max(0, Math.min(total - 1, sessionT))).p)
+  }
+
   /** jump to the start of the return phase */
   skipToReturn() {
     const ret = this.plan.phases.find((p) => p.n === 4) ?? this.plan.phases[this.plan.phases.length - 1]

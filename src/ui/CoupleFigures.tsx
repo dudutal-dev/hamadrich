@@ -101,13 +101,14 @@ export function CoupleFigures({ label, paused, mode, size, levels }: Props) {
 
   // soft edges so the video melts into the cosmos (black background of the clips ≈ the night sky)
   const mask = mode === 'fill'
-    ? 'radial-gradient(ellipse 75% 80% at 50% 50%, #000 62%, transparent 100%)'
+    ? 'linear-gradient(to right, transparent, #000 20%, #000 80%, transparent)'
     : 'radial-gradient(ellipse 62% 56% at 50% 50%, #000 70%, transparent 100%)'
   // landscape: 'contain' never crops heads; portrait: 'cover' crops the empty sides
   return (
     <video ref={ref} muted playsInline preload="auto" disablePictureInPicture aria-hidden
       style={{ display: 'block', objectFit: mode === 'fill' ? 'contain' : 'cover', opacity: 0, transition: `opacity ${OUT}ms ease`,
-        ...(mode === 'fill' ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { width: size?.w, height: size?.h }),
+        // fill: the element is exactly the 16:9 picture (centred), so the soft mask fades the picture's own edges into the sky
+        ...(mode === 'fill' ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(100vw, 177.78vh)', height: 'min(100vh, 56.25vw)' } : { width: size?.w, height: size?.h }),
         WebkitMaskImage: mask, maskImage: mask, pointerEvents: 'none' }} />
   )
 }
