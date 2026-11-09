@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 interface Props {
   color: string
@@ -21,7 +21,7 @@ const NEB = { peach: '#FF9A6B', rose: '#FF5FA8', magenta: '#F04CFF', cyan: '#39E
 export function Cosmos({ color, color2, intensity, phase, paused, ambient = false, levels }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
   const st = useRef({ color, color2, intensity, phase, paused, ambient, levels })
-  st.current = { color, color2, intensity, phase, paused, ambient, levels }
+  useLayoutEffect(() => { st.current = { color, color2, intensity, phase, paused, ambient, levels } })
 
   useEffect(() => {
     const cv = ref.current!

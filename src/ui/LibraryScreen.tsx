@@ -119,10 +119,8 @@ function Music() {
   const looseInput = useRef<HTMLInputElement>(null)
   const [loosePhases, setLoosePhases] = useState<Phase[]>([3])
 
-  const reload = async () => {
-    setAlbums(await db.albums.toArray())
-    setLoose((await db.assets.where('kind').equals('music').toArray()).filter((a) => !a.albumId))
-  }
+  const reload = () => Promise.all([db.albums.toArray(), db.assets.where('kind').equals('music').toArray()])
+    .then(([al, music]) => { setAlbums(al); setLoose(music.filter((a) => !a.albumId)) })
   useEffect(() => { void reload() }, [])
 
   const onAlbum = async (files: FileList | null) => {
@@ -173,6 +171,12 @@ function Music() {
 }
 
 /* ---------- Settings ---------- */
+function GainSlider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="flex flex-col gap-1 text-[15px]"><span className="opacity-70">{label}</span><input type="range" min={0} max={1} step={0.05} value={value} onChange={(e) => onChange(+e.target.value)} /></label>
+  )
+}
+
 function SettingsPane() {
   const [s, setS] = useState<Settings | null>(null)
   const [voices, setVoices] = useState<Array<{ voice_id: string; name: string }>>([])
@@ -184,9 +188,6 @@ function SettingsPane() {
     const r = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': s.elevenKey } })
     if (r.ok) setVoices((await r.json()).voices)
   }
-  const Slider = ({ k, label }: { k: 'musicGain' | 'voiceGain' | 'breathGain'; label: string }) => (
-    <label className="flex flex-col gap-1 text-[15px]"><span className="opacity-70">{label}</span><input type="range" min={0} max={1} step={0.05} value={s[k]} onChange={(e) => save({ [k]: +e.target.value })} /></label>
-  )
   return (
     <div className="flex flex-col gap-6 text-[15px]">
       <section className="flex flex-col gap-3">
@@ -216,7 +217,9 @@ function SettingsPane() {
       </section>
       <section className="flex flex-col gap-3">
         <div className="text-[17px]">עוצמות</div>
-        <Slider k="musicGain" label="מוזיקה" /><Slider k="voiceGain" label="קריינות" /><Slider k="breathGain" label="צלילי נשימה" />
+        {([['musicGain', 'מוזיקה'], ['voiceGain', 'קריינות'], ['breathGain', 'צלילי נשימה']] as const).map(([k, label]) => (
+          <GainSlider key={k} label={label} value={s[k]} onChange={(v) => save({ [k]: v })} />
+        ))}
         <label className="flex items-center justify-between"><span>רטט בנשימה</span><input type="checkbox" checked={s.haptics} onChange={(e) => save({ haptics: e.target.checked })} /></label>
       </section>
       <section className="flex flex-col gap-3">

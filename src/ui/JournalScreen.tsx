@@ -6,6 +6,7 @@ export function JournalScreen() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<string | null>(null)
+  const [now] = useState(() => Date.now())
 
   useEffect(() => { void db.journal.orderBy('startedAt').reverse().toArray().then(setEntries) }, [])
 
@@ -14,16 +15,16 @@ export function JournalScreen() {
   const stats = useMemo(() => {
     const days = new Set(entries.map((e) => e.startedAt.slice(0, 10)))
     let streak = 0
-    const d = new Date()
+    const d = new Date(now)
     for (;;) { const k = d.toISOString().slice(0, 10); if (days.has(k)) { streak++; d.setDate(d.getDate() - 1) } else break }
-    const weekAgo = Date.now() - 7 * 864e5
+    const weekAgo = now - 7 * 864e5
     const weekMin = Math.round(entries.filter((e) => new Date(e.startedAt).getTime() > weekAgo).reduce((s, e) => s + e.actualSec, 0) / 60)
-    const last30 = entries.filter((e) => e.moodAfter && Date.now() - new Date(e.startedAt).getTime() < 30 * 864e5).slice(0, 30).reverse()
+    const last30 = entries.filter((e) => e.moodAfter && now - new Date(e.startedAt).getTime() < 30 * 864e5).slice(0, 30).reverse()
     const tagCount = new Map<string, number>()
     entries.forEach((e) => e.tags.forEach((t) => tagCount.set(t, (tagCount.get(t) ?? 0) + 1)))
     const topTags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
     return { streak, weekMin, last30, topTags }
-  }, [entries])
+  }, [entries, now])
 
   const clearAll = async () => {
     if (!confirm('למחוק את כל רשומות היומן? ההקלטות יימחקו גם. לא ניתן לשחזר.')) return

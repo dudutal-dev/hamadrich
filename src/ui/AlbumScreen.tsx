@@ -4,6 +4,13 @@ import { type Album, type Asset, type Phase, db } from '../db'
 import { INTENTIONS, INTENTION_META, PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES } from '../engine/plan'
 import type { StartChoice } from './StartScreen'
 
+async function fetchAlbum(): Promise<{ album: Album | null; tracks?: Asset[] }> {
+  const a = await db.albums.toCollection().first()
+  if (!a) return { album: null }
+  const tracks = (await db.assets.where('albumId').equals(a.id).toArray()).sort((x, y) => (x.trackNo ?? 0) - (y.trackNo ?? 0))
+  return { album: a, tracks }
+}
+
 const CHAPTER_TEXT: Record<Phase, { title: string; sub: string }> = {
   1: { title: 'הגעה', sub: 'המדריך, התנוחה, הכניסה. ארבע רצועות קצרות שמניחות את הגוף.' },
   2: { title: 'שחרור', sub: 'כל הדברים חולפים. ההרמוניה, הנשימה, הפשטות. הכי הרבה מילים.' },
@@ -24,11 +31,7 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [preview, setPreview] = useState<{ id: string; el: HTMLAudioElement } | null>(null)
   const [intro, setIntro] = useState(false)
 
-  const load = async () => {
-    const a = await db.albums.toCollection().first()
-    setAlbum(a ?? null)
-    if (a) setTracks((await db.assets.where('albumId').equals(a.id).toArray()).sort((x, y) => (x.trackNo ?? 0) - (y.trackNo ?? 0)))
-  }
+  const load = () => fetchAlbum().then(({ album: a, tracks: t }) => { setAlbum(a); if (t) setTracks(t) })
   useEffect(() => { void load() }, [])
   useEffect(() => () => { preview?.el.pause() }, [preview])
 

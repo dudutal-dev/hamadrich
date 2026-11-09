@@ -230,7 +230,7 @@ export async function renderDroneBlob(phase: Phase, output: 'speakers' | 'headph
       d[n - xf + i] = d[n - xf + i] * (1 - a) + d[i] * a
     }
   }
-  const blob = encodeWav(buf, n - Math.floor(sr * 0.0))
+  const blob = encodeWav(buf, n)
   droneCache.set(key, blob)
   return blob
 }

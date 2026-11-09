@@ -24,7 +24,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [album, setAlbum] = useState<Album | null>(null)
   const [info, setInfo] = useState<Mode | null>(null)
   const [adv, setAdv] = useState(false)
-  const hour = new Date().getHours()
+  const [hour] = useState(() => new Date().getHours())
   const greeting = hour < 5 ? 'לילה טוב' : hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : hour < 21 ? 'ערב טוב' : 'לילה טוב'
 
   useEffect(() => { void db.albums.toCollection().first().then((a) => setAlbum(a ?? null)) }, [])
