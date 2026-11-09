@@ -2,23 +2,28 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type Album, type Mode, type Phase, db } from '../db'
 import { Halo } from './Halo'
+import { BODY_JOURNEYS, type BodyJourney, bodyJourney, isAdultUnlocked, unlockAdult } from '../engine/body'
 import { g, hasChosenAddress, useAddress } from '../address'
 import { AddressPicker } from './AddressPicker'
 import { INTENTIONS, INTENTION_META, MODE_LONG, MODE_META, PHASE_COLORS, PHASE_COLORS2 } from '../engine/plan'
 
-export interface StartChoice { mode: Mode; minutes: number; intention: string; voice: boolean; breath: boolean; albumId?: string; startTrackNo?: number; onlyPhases?: Phase[] }
+export interface StartChoice { mode: Mode; minutes: number; intention: string; voice: boolean; breath: boolean; albumId?: string; journey?: string; startTrackNo?: number; onlyPhases?: Phase[] }
 
-const MODE_ICON: Record<Mode, string> = { breath: '◌', meditation: '☾', deep: '✺', sleep: '☽', album: '♫' }
+const MODE_ICON: Record<Mode, string> = { breath: '◌', meditation: '☾', deep: '✺', sleep: '☽', album: '♫', body: '❋' }
 const MODE_GRAD: Record<Mode, [string, string]> = {
   breath: ['#7CCFBE', '#4F6FD6'],
   meditation: ['#B3A4F2', '#5E6AD2'],
   deep: ['#F2C26B', '#EBA17A'],
   sleep: ['#1B2A6B', '#0E0B18'],
   album: ['#EBA17A', '#B3A4F2'],
+  body: ['#E39470', '#B3A4F2'],
 }
 
 export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) {
   const [mode, setMode] = useState<Mode>('breath')
+  const [journey, setJourney] = useState<string | null>(null)
+  const [adult, setAdult] = useState(isAdultUnlocked)
+  const [gate, setGate] = useState(false)
   const [minutes, setMinutes] = useState(MODE_META.breath.defaultMin)
   const [intention, setIntention] = useState('שקט')
   const [custom, setCustom] = useState('')
@@ -34,9 +39,12 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
 
   useEffect(() => { void db.albums.toCollection().first().then((a) => setAlbum(a ?? null)) }, [])
 
-  const meta = MODE_META[mode]
+  const bj = mode === 'body' ? bodyJourney(journey ?? undefined) : undefined
+  const meta = bj ? { ...MODE_META.body, minMin: bj.minMin, maxMin: bj.maxMin } : MODE_META[mode]
   const maxMin = mode === 'album' && album ? Math.round(album.totalSec / 60) : meta.maxMin
-  const pick = (m: Mode) => { setMode(m); setMinutes(m === 'album' && album ? Math.round(album.totalSec / 60) : MODE_META[m].defaultMin) }
+  const pick = (m: Mode) => { setMode(m); setJourney(null); setMinutes(m === 'album' && album ? Math.round(album.totalSec / 60) : MODE_META[m].defaultMin) }
+  const pickBody = (j: BodyJourney) => { setMode('body'); setJourney(j.id); setMinutes(j.defaultMin) }
+  const startLabel = bj ? bj.title : MODE_META[mode].name
   const modes: Mode[] = ['deep', 'meditation', 'breath', 'sleep']
   const im = INTENTION_META[intention]
 
@@ -89,6 +97,22 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         <p className="text-[14px] opacity-75 leading-relaxed px-1">{album ? 'מסעות מאלבומים נמצאים בלשונית "אלבומים" – אפשר לייבא שם כמה אלבומים.' : 'יש לך אלבום שבנוי כמסע (למשל Psychedelic Prayers)? ייבא אותו בלשונית "אלבומים".'}</p>
       </section>
 
+      <section className="flex flex-col gap-3">
+        <div className="label">גוף ומיניות · 18+</div>
+        <p className="text-[14px] muted leading-relaxed px-1 -mt-1">מסעות אישיים לגוף, לתשוקה ולעונג. חושני ולא מפורש, בקצב שלך. מומלץ במקום פרטי ועם אוזניות.</p>
+        {BODY_JOURNEYS.filter((j) => j.level === 1).map((j) => <BodyCard key={j.id} j={j} on={mode === 'body' && journey === j.id} onPick={() => pickBody(j)} />)}
+        <div className="label mt-2">מתקדם · מגע ועוררות</div>
+        {adult
+          ? BODY_JOURNEYS.filter((j) => j.level === 2).map((j) => <BodyCard key={j.id} j={j} on={mode === 'body' && journey === j.id} onPick={() => pickBody(j)} />)
+          : (
+            <button onClick={() => setGate(true)} className="card rounded-3xl p-5 text-right flex items-center gap-4">
+              <span className="text-[26px]">🔒</span>
+              <span className="flex-1"><span className="block text-[17px] font-semibold">שלושה מסעות מתקדמים</span><span className="block text-[14px] muted mt-0.5">מגע מודע · נשימת אש · עונג בלי יעד</span></span>
+              <span className="text-[14px] font-medium">פתיחה</span>
+            </button>
+          )}
+      </section>
+
       <section className="card rounded-3xl p-5">
         <div className="flex justify-between items-baseline mb-3">
           <div className="label">משך</div>
@@ -99,7 +123,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         {mode === 'album' && minutes < maxMin - 5 && <p className="text-[14px] opacity-80 mt-3">קיצור מדלג על רצועות שלמות לפי שלב – לא חותך באמצע.</p>}
       </section>
 
-      <section>
+      {mode !== 'body' && <section>
         <div className="label mb-3">הכוונה</div>
         <div className="grid grid-cols-3 gap-2">
           {INTENTIONS.map((i) => {
@@ -119,7 +143,7 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         )}
         <input value={custom} onChange={(e) => { setCustom(e.target.value); if (e.target.value) setIntention(e.target.value) }} placeholder="או כוונה במילים שלך…"
           className="mt-4 w-full bg-transparent border-b border-ink/15 py-2 text-[15px] outline-none placeholder:opacity-40" />
-      </section>
+      </section>}
 
       <section>
         <button onClick={() => setAdv((v) => !v)} className="text-[14px] opacity-75 underline underline-offset-4">{adv ? 'פחות אפשרויות' : 'אפשרויות נוספות'}</button>
@@ -133,10 +157,24 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         )}
       </section>
 
-      <button onClick={() => onStart({ mode, minutes, intention, voice: mode !== 'album' && voice, breath, albumId: mode === 'album' ? album?.id : undefined })}
+      <button onClick={() => { if (mode === 'body' && !journey) return; onStart({ mode, minutes, intention: bj ? bj.title : intention, voice: mode !== 'album' && voice, breath, albumId: mode === 'album' ? album?.id : undefined, journey: journey ?? undefined }) }}
         className="fixed bottom-[calc(env(safe-area-inset-bottom)+68px)] right-5 left-5 rounded-2xl py-4 text-[18px] btn-psy active:scale-[0.98] transition-transform">
-        {g(a, 'התחל', 'התחילי')} {MODE_META[mode].name} · {minutes} דק'
+        {g(a, 'התחל', 'התחילי')} {startLabel} · {minutes} דק'
       </button>
+
+      {gate && createPortal(
+        <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={() => setGate(false)}>
+          <div className="fade-in sheet w-full rounded-t-[32px] p-6 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-ink/30 self-center -mt-2" />
+            <h2 className="text-[24px] font-semibold">מסעות מתקדמים</h2>
+            <p className="text-[15px] leading-relaxed">המסעות האלה כוללים מגע עצמי ועבודה ישירה עם עוררות ועונג. הם מיועדים למבוגרים בלבד, להאזנה לבד, במקום פרטי.</p>
+            <p className="text-[14px] muted leading-relaxed">בכל שלב יש הזמנה ולא הוראה. מותר לעצור בכל רגע. {g(a, 'אם עולים זיכרונות קשים – עצור, ושקול ליווי מקצועי.', 'אם עולים זיכרונות קשים – עצרי, ושקלי ליווי מקצועי.')}</p>
+            <button onClick={() => { unlockAdult(); setAdult(true); setGate(false) }} className="btn-psy rounded-2xl py-4 text-[16px]">{g(a, 'אני מעל 18 ונמצא במקום פרטי', 'אני מעל 18 ונמצאת במקום פרטי')}</button>
+            <button onClick={() => setGate(false)} className="text-[15px] muted py-2">לא עכשיו</button>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {info && createPortal(
         <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={() => setInfo(null)}>
@@ -157,5 +195,17 @@ export function StartScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
         document.body,
       )}
     </div>
+  )
+}
+
+function BodyCard({ j, on, onPick }: { j: BodyJourney; on: boolean; onPick: () => void }) {
+  return (
+    <button onClick={onPick} className={`rounded-3xl p-4 text-right transition-all duration-500 border ${on ? 'chip-on' : 'card'}`}>
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="text-[18px] font-semibold">{j.title}</div>
+        <div className="text-[14px] opacity-80 shrink-0">{j.defaultMin} דק'</div>
+      </div>
+      <div className="text-[14px] muted mt-1 leading-relaxed">{j.sub}</div>
+    </button>
   )
 }

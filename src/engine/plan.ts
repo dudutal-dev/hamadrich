@@ -1,5 +1,6 @@
 import { breathWindowsFor } from './albumBreath'
-import { type Address, VOICE_CLIPS, clipDur } from './voice'
+import { type Address, BODY_CLIPS, VOICE_CLIPS, clipDur } from './voice'
+import { BODY_JOURNEYS, bodyJourney } from './body'
 import { type Album, type Asset, type BreathPattern, type Cue, type Mode, type Phase, type PhaseSpan, type SessionPlan, uid } from '../db'
 
 export const PHASE_NAMES: Record<Phase, string> = {
@@ -32,6 +33,7 @@ export const MODE_META: Record<Mode, { name: string; sub: string; defaultMin: nu
   deep: { name: 'מסע עמוק', sub: 'חמישה שלבים מלאים, עיניים עצומות', defaultMin: 90, minMin: 45, maxMin: 120 },
   sleep: { name: 'שינה', sub: 'דעיכה הדרגתית לשקט', defaultMin: 30, minMin: 15, maxMin: 45 },
   album: { name: 'אלבום', sub: 'אלבום שלם כמסע', defaultMin: 93, minMin: 30, maxMin: 93 },
+  body: { name: 'גוף ומיניות', sub: 'מסעות אישיים לגוף, לתשוקה ולעונג', defaultMin: 25, minMin: 15, maxMin: 50 },
 }
 
 export const INTENTIONS = ['שקט', 'שחרור', 'בהירות', 'ריפוי', 'חיבור', 'הודיה']
@@ -51,6 +53,7 @@ export const MODE_LONG: Record<Mode, { what: string; when: string; phases: strin
   deep: { what: 'מסע מלא של שעה עד שעתיים: כל חמשת השלבים, קריינות עברית לפי הכוונה, שיא ארוך ושקט, חזרה הדרגתית, אינטגרציה ויומן.', when: 'סשן עצמאי בעיניים עצומות, בשכיבה, בלי הפרעות. כפתור חירום פעיל.', phases: 'הגעה 10% → שחרור 20% → שיא 35% → חזרה 25% → אינטגרציה 10%' },
   sleep: { what: 'דעיכה הדרגתית לשקט, בלי שלב חזרה ובלי קריינות בסוף – האפליקציה נכבית לבד.', when: 'הירדמות.', phases: 'הגעה → שחרור → שיא שהולך ונעלם' },
   album: { what: 'אלבום שלם כמסע: הרצועות בסדר המקורי, ממופות לחמשת השלבים, עם נשימה בקטעים בלי דיבור, אורב ויומן.', when: 'כשרוצים שהמוזיקה והקול של האלבום יובילו, בלי להתעסק בנגן.', phases: 'הפרקים לפי מיפוי האלבום (ניתן לעריכה בלשונית אלבומים)' },
+  body: { what: 'מסעות אישיים (לבד) לגוף ולמיניות: נוכחות, תשוקה, שחרור בושה, ובמתקדם – מגע מודע, נשימת אש ועונג בלי יעד. חושני ולא מפורש, בקצב שלך.', when: 'במקום פרטי ושקט, בשכיבה, עם אוזניות. מבוגרים בלבד.', phases: 'הגעה → שחרור והעמקה → שיא שקט → חזרה ללב → סגירה ויומן' },
 }
 
 /** phase shares per mode (sum = 1) */
@@ -58,6 +61,7 @@ const SHARES: Record<Exclude<Mode, 'album'>, Record<Phase, number>> = {
   deep: { 1: 0.10, 2: 0.20, 3: 0.35, 4: 0.25, 5: 0.10 },
   meditation: { 1: 0.12, 2: 0.22, 3: 0.32, 4: 0.22, 5: 0.12 },
   breath: { 1: 0.15, 2: 0.35, 3: 0.10, 4: 0.25, 5: 0.15 },
+  body: { 1: 0.12, 2: 0.33, 3: 0.30, 4: 0.15, 5: 0.10 },
   sleep: { 1: 0.15, 2: 0.35, 3: 0.50, 4: 0, 5: 0 },
 }
 
@@ -92,6 +96,8 @@ interface BuildInput {
   onlyPhases?: Phase[]
   /** narration address (masculine / feminine) */
   address?: Address
+  /** body & sexuality journey id (mode 'body') */
+  journey?: string
 }
 
 const shuffle = <T,>(a: T[]) => a.map((x) => [Math.random(), x] as const).sort((p, q) => p[0] - q[0]).map((p) => p[1])
@@ -162,6 +168,7 @@ function clearBreathUnderVoice(input: Cue[]): Cue[] {
 export function buildPlan(input: BuildInput): SessionPlan {
   const { mode, intention } = input
   if (mode === 'album' && input.album && input.albumTracks?.length) return buildAlbumPlan(input)
+  if (mode === 'body') return buildBodyPlan(input)
 
   const durationSec = input.durationSec
   address = input.address ?? 'm'
@@ -184,6 +191,66 @@ export function buildPlan(input: BuildInput): SessionPlan {
   for (const v of sched.voice) if (v.t < durationSec) cues.push({ t: v.t, layer: 'voice', action: 'play', clip: v.id, duck: -7 })
   cues = clearBreathUnderVoice(cues)
   return { id: uid(), mode, intention, durationSec, phases, cues, address, createdAt: new Date().toISOString() }
+}
+
+/** Body & sexuality journey: its own clips in order per phase, breath after the explanation, silent peak with sparse anchors */
+function buildBodyPlan(input: BuildInput): SessionPlan {
+  const j = bodyJourney(input.journey) ?? BODY_JOURNEYS[0]
+  address = input.address ?? 'm'
+  const durationSec = input.durationSec
+  const phases = buildPhases('body', durationSec)
+  const mine = BODY_CLIPS.filter((c) => c.journey === j.id && (!c.only || c.only === address))
+  const role = (r: string) => mine.filter((c) => c.role === r)
+  const voice: { t: number; id: string }[] = []
+  let busy = -Infinity
+  const put = (t: number, id: string, limit = Infinity) => {
+    const at = Math.max(t, busy + 3)
+    if (at + dur(id) > limit) return false
+    voice.push({ t: at, id }); busy = at + dur(id); return true
+  }
+  const bp: BreathPattern = input.breathEnabled ? j.breath : 'none'
+  let cues: Cue[] = []
+  for (const { n, startSec: s, endSec: e } of phases) {
+    const L = e - s
+    cues.push({ t: s, layer: 'visual', action: 'phase', phase: n })
+    cues.push({ t: s, layer: 'music', action: 'play' }) // phase drone
+    cues.push({ t: s, layer: 'breath', action: 'pattern', pattern: 'none' })
+    if (n === 1) {
+      for (const c of role('open')) put(s + 6, c.id)
+      for (const c of role('intro')) put(0, c.id)
+      if (busy + 2 < e - 15) cues.push({ t: busy + 1.5, layer: 'breath', action: 'pattern', pattern: bp })
+    } else if (n === 2) {
+      cues.push({ t: s + 1, layer: 'breath', action: 'pattern', pattern: bp })
+      const rel = role('release')
+      let from = s + 15
+      if (j.id === 'fire') {
+        // pelvic floor first, then one minute of fire breath, then the energy wave
+        const [floor, ...rest] = rel
+        if (floor) put(s + 10, floor.id)
+        for (const c of role('fire')) put(0, c.id)
+        if (input.breathEnabled) {
+          cues.push({ t: busy + 1, layer: 'breath', action: 'pattern', pattern: 'fire' })
+          cues.push({ t: busy + 61, layer: 'breath', action: 'pattern', pattern: bp })
+        }
+        from = busy + 75
+        rest.forEach((c, i) => put(from + ((e - 20 - from) * i) / Math.max(1, rest.length), c.id, e - 5))
+      } else {
+        rel.forEach((c, i) => put(from + ((L - 40) * i) / Math.max(1, rel.length), c.id, e - 5))
+      }
+    } else if (n === 3) {
+      const pk = role('peak')
+      const lead = Math.min(90, L * 0.15)
+      pk.forEach((c, i) => put(s + lead + ((L - lead - 30) * i) / Math.max(1, pk.length), c.id, e - 10))
+    } else if (n === 4) {
+      for (const c of role('return')) put(s + 15, c.id)
+      cues.push({ t: busy + 1.5, layer: 'breath', action: 'pattern', pattern: bp })
+    } else {
+      for (const c of role('close')) put(Math.max(busy + 4, e - dur(c.id) - 10), c.id)
+    }
+  }
+  if (input.voiceEnabled) for (const v of voice) if (v.t < durationSec) cues.push({ t: v.t, layer: 'voice', action: 'play', clip: v.id, duck: -8 })
+  cues = clearBreathUnderVoice(cues)
+  return { id: uid(), mode: 'body', intention: j.title, durationSec, phases, cues, address, journey: j.id, createdAt: new Date().toISOString() }
 }
 
 /** Album mode: tracks play in order, phases follow the album's phaseMap; duration can shorten by skipping tracks */
