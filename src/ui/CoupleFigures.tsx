@@ -1,155 +1,116 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 
-/** Psychedelic illustrated couple for the couple evenings (illustrations generated with ElevenLabs, see public/couple).
- *  Every script step has its own set of frames – e.g. "היא נוגעת · הוא מקבל" shows her touching him on the chest,
- *  the shoulders, the face – and until the next step the frames keep changing at the pace of the music
- *  (every few bars, counted from the bass). Frames crossfade with a light echo, slowly drift and zoom,
- *  breathe with the guided breath and glow with the bass. Images carry alpha (black → transparent), so the
- *  cosmos background shows through without CSS blend modes. */
+/** Psychedelic couple video for the couple evenings: short clips generated with ElevenLabs (Veo 3.1), one or two per
+ *  script step – e.g. "היא נוגעת · הוא מקבל" shows her hands gliding over his chest, then caressing his face.
+ *  Each file is a ping-pong loop (forward + reverse), so it repeats seamlessly with natural motion; within a step the
+ *  clips alternate after each loop. Clips change through a short dip to dark – never overlapping – so the figures are
+ *  never doubled or blurred. The glow breathes softly with the bass of the music. */
 
 interface Props {
   label: string
-  /** 0..1 – how full the lungs are (guided breath); negative = no guidance → slow natural rhythm */
-  breath: number
   paused: boolean
-  size: { w: number; h: number }
+  /** 'fill' – full-screen background (landscape / TV); 'box' – a framed area (portrait phone) */
+  mode: 'fill' | 'box'
+  size?: { w: number; h: number }
   levels?: () => { bass: number; mid: number; high: number; energy: number }
 }
 
-/** script label → frames (keyword based so new evenings work too; the more specific rules first) */
+/** script label → clips (keyword based so new evenings work too; the more specific rules first) */
 const RULES: [RegExp | string, string[]][] = [
-  [/שלכם/, ['mutual-1', 'merge']],
-  [/מגע משותף/, ['mutual-1', 'mutual-2']],
-  [/חיבוק/, ['hug-kneel']],
-  [/הוא מוביל/, ['he-leads', 'dance']],
-  [/היא מובילה/, ['she-leads', 'dance-2']],
-  [/ריקוד/, ['dance', 'dance-2']],
-  [/היא נוגעת/, ['she-touch-1', 'she-touch-2', 'she-touch-3']],
-  [/הוא נוגע/, ['he-touch-1', 'he-touch-2', 'he-touch-3']],
-  [/היא מקבלת|הוא נותן/, ['her-receives-1', 'her-receives-2', 'her-receives-3']],
-  [/הוא מקבל|היא נותנת/, ['him-receives-1', 'him-receives-2', 'him-receives-3']],
+  [/שלכם/, ['mutual', 'merge']],
+  [/מגע משותף/, ['mutual', 'dance']],
+  [/חיבוק/, ['hug']],
+  [/מוביל/, ['dance-lead', 'dance']],
+  [/ריקוד/, ['dance', 'dance-lead']],
+  [/היא נוגעת/, ['she-touch', 'she-touch-face']],
+  [/הוא נוגע/, ['he-touch-waist', 'he-touch-hair']],
+  [/היא מקבלת|הוא נותן/, ['her-receives-a', 'her-receives-b']],
+  [/הוא מקבל|היא נותנת/, ['him-receives-a', 'him-receives-b']],
   [/הוא · יד על הלב/, ['heart-him']],
-  [/היא · יד על הלב/, ['heart-her', 'heart-both']],
+  [/היא · יד על הלב/, ['heart-her']],
   [/שתיקה/, ['silence']],
   [/נשימה/, ['breath']],
-  [/מבט/, ['gaze']],
-  [/מול/, ['anchor']],
-  [/בדיקה/, ['check']],
-  [/להאט/, ['mutual-1', 'check']],
-  [/להתרחב/, ['mutual-2', 'he-touch-1']],
+  [/מבט|מול/, ['gaze']],
+  [/בדיקה|להאט/, ['mutual']],
+  [/להתרחב/, ['he-touch-waist', 'she-touch']],
   [/הוא מדבר/, ['speak-him']],
   [/היא מדברת/, ['speak-her']],
-  [/שיתוף/, ['share']],
-  [/החלפה/, ['swap']],
+  [/שיתוף/, ['sit-open', 'hug']],
   [/טקס/, ['ritual']],
-  [/מילת עצירה/, ['stop-word']],
-  [/יותר|פתיחה/, ['sit-open']],
-  ['שניכם', ['share', 'hug-kneel']], // closing moment of an evening
+  [/החלפה|מילת עצירה|יותר|פתיחה/, ['sit-open']],
+  ['שניכם', ['hug']], // closing moment of an evening
 ]
-function framesFor(label: string): string[] {
+function clipsFor(label: string): string[] {
   const l = label.trim()
   for (const [r, f] of RULES) if (typeof r === 'string' ? l === r : r.test(l)) return f
-  return ['anchor']
+  return ['gaze']
 }
+const src = (name: string) => `${import.meta.env.BASE_URL}couple/${name}.mp4`
+const RATE = 0.9 // a touch slower than generated – matches the slow, sensual music
+const OUT = 700 // ms fade to dark before switching clip
 
-const cache = new Map<string, HTMLImageElement>()
-function img(name: string): HTMLImageElement {
-  let i = cache.get(name)
-  if (!i) { i = new Image(); i.decoding = 'async'; i.src = `${import.meta.env.BASE_URL}couple/${name}.webp`; cache.set(name, i) }
-  return i
-}
-const ready = (i: HTMLImageElement) => i.complete && i.naturalWidth > 0
+export function CoupleFigures({ label, paused, mode, size, levels }: Props) {
+  const ref = useRef<HTMLVideoElement>(null)
+  const st = useRef({ label, paused, levels })
+  useLayoutEffect(() => { st.current = { label, paused, levels } })
+  const clip = useRef({ set: [] as string[], idx: 0, name: '', timer: 0 })
 
-interface Layer { name: string; born: number; dx: number; dy: number }
+  // show a clip: fade out, swap, fade in once it actually plays
+  const show = (name: string) => {
+    const v = ref.current, c = clip.current
+    if (!v || c.name === name) return
+    c.name = name
+    window.clearTimeout(c.timer)
+    v.style.opacity = '0'
+    c.timer = window.setTimeout(() => {
+      v.src = src(name); v.loop = c.set.length < 2; v.playbackRate = RATE
+      if (!st.current.paused) v.play().catch(() => {})
+    }, v.currentSrc ? OUT : 0)
+  }
 
-export function CoupleFigures({ label, breath, paused, size, levels }: Props) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  const st = useRef({ label, breath, paused, levels })
-  useLayoutEffect(() => { st.current = { label, breath, paused, levels } })
-
-  // preload this step's frames
-  useEffect(() => { framesFor(label).forEach(img) }, [label])
+  // script step changed → its first clip
+  useEffect(() => {
+    const set = clipsFor(label), c = clip.current
+    if (set.join() === c.set.join()) return
+    c.set = set; c.idx = 0; show(set[0])
+  }, [label]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const cv = ref.current!
-    const ctx = cv.getContext('2d')!
-    const dpr = Math.min(1.5, window.devicePixelRatio || 1)
-    cv.width = size.w * dpr; cv.height = size.h * dpr
-    const lerp = (a: number, b: number, k: number) => a + (b - a) * k
-    const FADE = 3.2 // crossfade seconds
-    let raf = 0, last = 0, t = 0, bassS = 0, beat = 0, lastBass = 0, brS = 0.5, beats = 0, glowS = 0, merged = 0
-    let curLabel = st.current.label, set = framesFor(curLabel), idx = 0
-    const newLayer = (name: string): Layer => ({ name, born: t, dx: (Math.random() - 0.5) * 0.05, dy: (Math.random() - 0.5) * 0.035 })
-    let layers: Layer[] = [newLayer(set[0])]
-    let since = 0 // seconds on the current frame
+    const v = ref.current
+    if (!v) return
+    if (paused) v.pause(); else if (v.src) v.play().catch(() => {})
+  }, [paused])
 
-    const draw = (now: number) => {
-      raf = requestAnimationFrame(draw)
-      if (now - last < 33) return
-      const dt = Math.min(0.1, (now - last) / 1000); last = now
-      const s = st.current
-      const lv = s.levels?.() ?? { bass: 0, mid: 0, high: 0, energy: 0 }
-      if (!s.paused) {
-        t += dt; since += dt
-        bassS = lerp(bassS, lv.bass, 0.2)
-        if (lv.bass - lastBass > 0.08 && beat < 0.4) { beat = 1; beats++ }
-        lastBass = lv.bass; beat *= 0.88
-      }
-      glowS = lerp(glowS, bassS, 0.1)
-
-      if (s.label !== curLabel) {
-        // script step changed → crossfade into its first frame
-        curLabel = s.label; set = framesFor(curLabel); idx = 0
-        layers.push(newLayer(set[0])); since = 0; beats = 0
-        set.slice(1).forEach(img)
-      } else if (set.length > 1 && !s.paused && ((since > 9 && beats >= 16) || since > 20)) {
-        // within a step: the action continues – next frame every ~16 beats of the music (a few bars), 9–20 s
-        idx = (idx + 1) % set.length
-        layers.push(newLayer(set[idx])); since = 0; beats = 0
-      }
-      // drop layers fully covered by a newer, loaded, faded-in one
-      while (layers.length > 1 && t - layers[1].born > FADE && ready(img(layers[1].name))) layers.shift()
-      if (layers.length > 3) layers = layers.slice(-3)
-
-      brS = lerp(brS, s.breath < 0 ? 0.5 + 0.5 * Math.sin((t * 2 * Math.PI) / 9) : s.breath, 0.15)
-      // after the farewell the couple slowly dissolves into the stars
-      merged = /שלכם/.test(curLabel) ? Math.min(1, merged + dt / 120) : Math.max(0, merged - dt / 3)
-      const fadeOut = 1 - 0.6 * merged
-
-      const W = size.w, H = size.h
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, W, H)
-      for (let li = 0; li < layers.length; li++) {
-        const L = layers[li], im = img(L.name)
-        if (!ready(im)) continue
-        const age = t - L.born
-        const a = li === 0 ? 1 : Math.min(1, age / FADE)
-        const alpha = a * a * (3 - 2 * a) * fadeOut
-        if (alpha <= 0.01) continue
-        // fit height with a slight zoom; slow drift + zoom over the frame's life; breath and beat pulse
-        const life = Math.min(1, age / 24)
-        const scale = (H / im.naturalHeight) * (1.04 + life * 0.06 + brS * 0.018 + beat * 0.008)
-        const w = im.naturalWidth * scale, h = im.naturalHeight * scale
-        const cx = W / 2 + L.dx * life * W, cy = H / 2 + L.dy * life * H
-        ctx.save()
-        ctx.translate(cx, cy); ctx.rotate(Math.sin(t * 0.21 + li) * 0.008)
-        ctx.globalCompositeOperation = 'source-over'
-        ctx.globalAlpha = alpha
-        ctx.drawImage(im, -w / 2, -h / 2, w, h)
-        // luminous echo: a larger additive copy that swells with the bass and during crossfades
-        const echo = Math.min(0.6, (0.14 + glowS * 0.45 + beat * 0.15) * alpha * (a < 1 ? 1.5 : 1))
-        if (echo > 0.02) {
-          const e = 1.035 + glowS * 0.04
-          ctx.globalCompositeOperation = 'lighter'
-          ctx.globalAlpha = echo
-          ctx.drawImage(im, (-w * e) / 2, (-h * e) / 2, w * e, h * e)
-        }
-        ctx.restore()
-      }
+  useEffect(() => {
+    const v = ref.current!
+    const onPlaying = () => { v.playbackRate = RATE; v.style.opacity = '1' }
+    // within a step the action continues: after each full (ping-pong) loop, the next clip of the step
+    const onEnded = () => {
+      const c = clip.current
+      if (c.set.length < 2) { v.currentTime = 0; v.play().catch(() => {}); return }
+      c.idx = (c.idx + 1) % c.set.length; show(c.set[c.idx])
     }
-    raf = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(raf)
-  }, [size.w, size.h])
+    v.addEventListener('playing', onPlaying); v.addEventListener('ended', onEnded)
+    // bass → soft glow (10 Hz is plenty, and cheap)
+    let bassS = 0
+    const iv = window.setInterval(() => {
+      const lv = st.current.levels?.()
+      if (!lv) return
+      bassS += (lv.bass - bassS) * 0.35
+      v.style.filter = `brightness(${(1 + bassS * 0.22).toFixed(3)}) saturate(${(1.05 + bassS * 0.2).toFixed(3)})`
+    }, 100)
+    const c = clip.current
+    return () => { v.removeEventListener('playing', onPlaying); v.removeEventListener('ended', onEnded); window.clearInterval(iv); window.clearTimeout(c.timer) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <canvas ref={ref} style={{ width: size.w, height: size.h, display: 'block' }} aria-hidden />
+  // soft edges so the video melts into the cosmos (black background of the clips ≈ the night sky)
+  const mask = mode === 'fill'
+    ? 'radial-gradient(ellipse 75% 80% at 50% 50%, #000 62%, transparent 100%)'
+    : 'radial-gradient(ellipse 62% 56% at 50% 50%, #000 70%, transparent 100%)'
+  return (
+    <video ref={ref} muted playsInline preload="auto" disablePictureInPicture aria-hidden
+      style={{ display: 'block', objectFit: 'cover', opacity: 0, transition: `opacity ${OUT}ms ease`,
+        ...(mode === 'fill' ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { width: size?.w, height: size?.h }),
+        WebkitMaskImage: mask, maskImage: mask, pointerEvents: 'none' }} />
+  )
 }

@@ -106,6 +106,11 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
       className="h-full relative flex flex-col items-center select-none touch-none overflow-hidden" style={{ background: '#070510' }}>
       <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} levels={() => engine.levels()} focus={orbCenter} />
+      {isCouple && landscape && <>
+        {/* landscape / TV: the couple fills the screen; a soft shade at the bottom keeps the turn label readable */}
+        <CoupleFigures mode="fill" label={s.label} paused={s.paused} levels={() => engine.levels()} />
+        <div className="absolute inset-x-0 bottom-0 h-[38%] pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(7,5,16,0.85), transparent)' }} />
+      </>}
 
       {/* top bar */}
       <div className="relative w-full flex justify-between items-center px-4 pt-[calc(env(safe-area-inset-top)+10px)]" style={ui}>
@@ -123,12 +128,11 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       </div>
 
       {/* center */}
-      <div className={`relative flex-1 flex ${tv && landscape ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${tv ? 'justify-center' : 'justify-start pt-6'}`}>
+      <div className={`relative flex-1 flex ${tv && landscape && !isCouple ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${isCouple && landscape ? 'justify-end pb-[calc(env(safe-area-inset-bottom)+12px)]' : tv ? 'justify-center' : isCouple ? 'justify-start pt-2' : 'justify-start pt-6'}`}>
         <div ref={orbRef}>{isCouple
-          ? <CoupleFigures label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: Math.round(Math.min(vp.w * 0.96, tv && landscape ? vp.w * 0.6 : vp.w)), h: Math.round(tv ? vp.h * (landscape ? 0.86 : 0.62) : Math.min(vp.h * 0.5, orbSize * 1.75)) }}
-              breath={s.breath === 'inhale' ? s.breathProgress : s.breath === 'exhale' ? 1 - s.breathProgress : s.breath === 'hold' ? 1 : s.breath === 'hold2' ? 0 : -1} />
+          ? (landscape ? null : <CoupleFigures mode="box" label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: vp.w, h: Math.round(Math.min(vp.h * (tv ? 0.62 : 0.56), vp.w * 1.25)) }} />)
           : <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} />}</div>
-        <div className={`${tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
+        <div className={`${isCouple ? (landscape ? '' : 'mt-3') : tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
           {s.label && <div key={s.label} className="fade-in text-[clamp(20px,4.5vmin,44px)] font-semibold mb-3 text-center px-4" style={{ color: color2, textShadow: `0 0 24px ${color}` }}>{s.label}</div>}
           {s.breath !== 'none' && !s.paused ? (
             <>
