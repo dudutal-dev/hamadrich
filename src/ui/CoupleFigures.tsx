@@ -107,9 +107,10 @@ export function CoupleFigures({ label, paused, mode, size, levels }: Props) {
   const mask = mode === 'fill'
     ? 'radial-gradient(ellipse 75% 80% at 50% 50%, #000 62%, transparent 100%)'
     : 'radial-gradient(ellipse 62% 56% at 50% 50%, #000 70%, transparent 100%)'
+  // landscape: 'contain' never crops heads; portrait: 'cover' crops the empty sides
   return (
     <video ref={ref} muted playsInline preload="auto" disablePictureInPicture aria-hidden
-      style={{ display: 'block', objectFit: 'cover', opacity: 0, transition: `opacity ${OUT}ms ease`,
+      style={{ display: 'block', objectFit: mode === 'fill' ? 'contain' : 'cover', opacity: 0, transition: `opacity ${OUT}ms ease`,
         ...(mode === 'fill' ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { width: size?.w, height: size?.h }),
         WebkitMaskImage: mask, maskImage: mask, pointerEvents: 'none' }} />
   )
