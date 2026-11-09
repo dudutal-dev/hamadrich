@@ -17,6 +17,9 @@ registerSW({
     if (r) setInterval(() => { if (document.visibilityState === 'visible') void r.update() }, 30 * 60 * 1000)
   },
 })
+// keep the app's files (voice, breath, music) permanently: ask the browser not to evict our storage under pressure
+void navigator.storage?.persist?.().catch(() => false)
+
 // look for updates every time the app is opened / comes back to the foreground
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') void checkForUpdate()

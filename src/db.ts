@@ -49,13 +49,15 @@ export interface PhaseSpan { n: Phase; startSec: number; endSec: number }
 export interface Cue {
   t: number
   layer: Layer
-  action: 'play' | 'stop' | 'pattern' | 'phase'
+  action: 'play' | 'stop' | 'pattern' | 'phase' | 'label'
   asset?: string
   /** built-in narration clip id (public/voice) */
   clip?: string
   pattern?: BreathPattern
   phase?: Phase
   duck?: number
+  /** on-screen instruction (couple evenings: whose turn it is) */
+  label?: string
 }
 
 export interface SessionPlan {

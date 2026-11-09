@@ -71,7 +71,7 @@ export default function App() {
 
   const reset = () => { setStage('start'); setPlan(null); setChoice(null); setDraft(null); setTab('journal') }
 
-  if (stage === 'prepare' && choice) return <PrepareScreen mode={choice.mode} loading={loading} onBegin={onBegin} onCancel={() => setStage('start')} />
+  if (stage === 'prepare' && choice) return <PrepareScreen mode={choice.mode} journey={choice.journey} loading={loading} onBegin={onBegin} onCancel={() => setStage('start')} />
   if (stage === 'journey' && engine && settings) return <JourneyScreen engine={engine} settings={settings} onEnd={onEnd} />
   if (stage === 'integration' && draft) return <IntegrationScreen draft={draft} question={bodyJourney(plan?.journey)?.question} onDone={reset} />
 

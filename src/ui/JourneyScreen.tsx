@@ -121,7 +121,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
       {/* center */}
       <div className={`relative flex-1 flex ${tv && landscape ? 'flex-row gap-[6vw]' : 'flex-col'} items-center ${tv ? 'justify-center' : 'justify-start pt-6'}`}>
         <div ref={orbRef}><Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} /></div>
-        <div className={`${tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
+        <div className={`${tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll ? 0 : 1, transition: 'opacity 1200ms' }}>
+          {s.label && <div key={s.label} className="fade-in text-[clamp(20px,4.5vmin,44px)] font-semibold mb-3 text-center px-4" style={{ color: color2, textShadow: `0 0 24px ${color}` }}>{s.label}</div>}
           {s.breath !== 'none' && !s.paused ? (
             <>
               <div className={`${tv ? 'text-[clamp(32px,6vmin,72px)]' : 'text-[28px]'} font-semibold tracking-wide`} style={{ textShadow: `0 0 28px ${color2}` }}>{BREATH_WORD[s.breath]}</div>

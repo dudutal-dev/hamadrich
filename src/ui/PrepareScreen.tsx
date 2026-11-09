@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Mode } from '../db'
 import { Halo } from './Halo'
+import { bodyJourney } from '../engine/body'
 import { type Address, g, useAddress } from '../address'
 
 const albumLines = (a: Address) => [
@@ -17,15 +18,21 @@ const bodyLines = (a: Address) => [
   'אין כאן מה להשיג. רק להרגיש.',
   g(a, 'אתה מוביל. מותר לעצור בכל רגע.', 'את מובילה. מותר לעצור בכל רגע.'),
 ]
+const coupleLines = [
+  'כבו את הטלפונים האחרים. אור עמום.',
+  'רמקול או AirPlay, ומצב טלוויזיה אם יש.',
+  'בחרו מילת עצירה. היא תמיד שם.',
+  'אין לאן להגיע. רק להיות יחד.',
+]
 const lines = (a: Address): Record<'short' | 'deep', string[]> => ({
   short: [g(a, 'מצא תנוחה נוחה.', 'מצאי תנוחה נוחה.'), 'הטלפון יכול לנוח עכשיו.', 'נגיעה אחת על המסך – עצירה. לחיצה ארוכה – עוד עשר דקות.'],
   deep: ['לא נוהגים הערב. מים בהישג יד.', g(a, 'אם אינך מרגיש יציב – אל תישאר לבד.', 'אם אינך מרגישה יציבה – אל תישארי לבד.'), 'אפשר לעצור בכל רגע. לחיצה ארוכה של שלוש שניות מביאה עזרה.', g(a, 'מצא תנוחה נוחה. הטלפון יכול לנוח עכשיו.', 'מצאי תנוחה נוחה. הטלפון יכול לנוח עכשיו.')],
 })
 
-export function PrepareScreen({ mode, onBegin, onCancel, loading }: { mode: Mode; onBegin: () => void; onCancel: () => void; loading: boolean }) {
+export function PrepareScreen({ mode, journey, onBegin, onCancel, loading }: { mode: Mode; journey?: string; onBegin: () => void; onCancel: () => void; loading: boolean }) {
   const a = useAddress()
   const L = lines(a)
-  const shown = mode === 'album' ? albumLines(a) : mode === 'body' ? bodyLines(a) : mode === 'deep' ? L.deep : L.short
+  const shown = mode === 'album' ? albumLines(a) : mode === 'body' && bodyJourney(journey)?.level === 3 ? coupleLines : mode === 'body' ? bodyLines(a) : mode === 'deep' ? L.deep : L.short
   const [i, setI] = useState(0)
   const [mood, setMood] = useState<number | null>(null)
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % shown.length), 6000); return () => clearInterval(id) }, [shown.length])

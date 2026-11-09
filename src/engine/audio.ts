@@ -39,6 +39,8 @@ export interface EngineState {
   trackNo: number
   trackCount: number
   musicGain: number
+  /** on-screen instruction (couple evenings) */
+  label: string
 }
 
 type Listener = (s: EngineState) => void
@@ -291,7 +293,7 @@ export class SessionEngine {
 
   constructor(public plan: SessionPlan) {
     this.musicCues = plan.cues.filter((c) => c.layer === 'music' && c.asset)
-    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: this.musicCues.length, musicGain: 0.8 }
+    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, trackCount: this.musicCues.length, musicGain: 0.8, label: '' }
   }
 
   private now() { return Date.now() / 1000 }
@@ -449,8 +451,8 @@ export class SessionEngine {
 
   /** fire due cues; after a background stall only the latest state per layer is applied (no burst of track restarts, no stale narration) */
   private fireDue(due: Cue[], t: number) {
-    const last = (layer: Cue['layer']) => { for (let i = due.length - 1; i >= 0; i--) if (due[i].layer === layer) return due[i]; return undefined }
-    for (const c of [last('visual'), last('breath'), last('music')]) if (c) this.fire(c)
+    const lastOf = (f: (c: Cue) => boolean) => { for (let i = due.length - 1; i >= 0; i--) if (f(due[i])) return due[i]; return undefined }
+    for (const c of [lastOf((x) => x.layer === 'visual' && x.action === 'phase'), lastOf((x) => x.layer === 'visual' && x.action === 'label'), lastOf((x) => x.layer === 'breath'), lastOf((x) => x.layer === 'music')]) if (c) this.fire(c)
     for (const c of due) if (c.layer === 'voice' && t - this.toSession(c.t) < 5) this.fire(c)
   }
 
@@ -500,6 +502,7 @@ export class SessionEngine {
   private fire(c: Cue) {
     if (!this.ctx) return
     if (c.layer === 'music' && c.action === 'play' && this.state.paused) return
+    if (c.layer === 'visual' && c.action === 'label') this.state.label = c.label ?? ''
     if (c.layer === 'visual' && c.action === 'phase' && c.phase) {
       this.state.phase = c.phase; this.state.phaseName = PHASE_NAMES[c.phase]
       if ('mediaSession' in navigator && navigator.mediaSession.metadata) navigator.mediaSession.metadata.artist = PHASE_NAMES[c.phase]
@@ -654,7 +657,9 @@ export class SessionEngine {
     // re-fire state cues up to planT without audio restarts except music
     const stateCues = this.plan.cues.filter((c) => c.t <= planT)
     const lastMusic = [...stateCues].reverse().find((c) => c.layer === 'music')
-    const lastPhase = [...stateCues].reverse().find((c) => c.layer === 'visual')
+    const lastPhase = [...stateCues].reverse().find((c) => c.layer === 'visual' && c.action === 'phase')
+    const lastLabel = [...stateCues].reverse().find((c) => c.layer === 'visual' && c.action === 'label')
+    if (lastLabel) this.fire(lastLabel)
     const lastBreath = [...stateCues].reverse().find((c) => c.layer === 'breath')
     if (lastPhase) this.fire(lastPhase)
     if (lastBreath) this.fire(lastBreath)
