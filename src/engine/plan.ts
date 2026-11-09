@@ -65,6 +65,14 @@ const SHARES: Record<Exclude<Mode, 'album'>, Record<Phase, number>> = {
   sleep: { 1: 0.15, 2: 0.35, 3: 0.50, 4: 0, 5: 0 },
 }
 
+/** built-in music per mode and phase (public/music) – replaces the synthetic drone */
+const MODE_MUSIC: Record<'breath' | 'meditation' | 'deep' | 'sleep', Record<Phase, string>> = {
+  breath: { 1: 'journey-arrive', 2: 'journey-release', 3: 'journey-release', 4: 'journey-release', 5: 'journey-arrive' },
+  meditation: { 1: 'journey-arrive', 2: 'journey-release', 3: 'journey-peak', 4: 'journey-release', 5: 'journey-arrive' },
+  deep: { 1: 'journey-arrive', 2: 'journey-release', 3: 'journey-peak', 4: 'journey-release', 5: 'journey-arrive' },
+  sleep: { 1: 'sleep', 2: 'sleep', 3: 'sleep', 4: 'sleep', 5: 'sleep' },
+}
+
 const BREATH_BY_PHASE: Record<Phase, BreathPattern> = { 1: '478', 2: 'coherent', 3: 'none', 4: 'coherent', 5: 'none' }
 
 export function buildPhases(mode: Mode, durationSec: number): PhaseSpan[] {
@@ -175,13 +183,19 @@ export function buildPlan(input: BuildInput): SessionPlan {
   const phases = buildPhases(mode, durationSec)
   const sched = input.voiceEnabled ? scheduleVoice(mode, phases, intention, input.breathEnabled) : { voice: [], breathStartAfter: new Map<Phase, number>() }
   let cues: Cue[] = []
+  let lastTrack = ''
 
   for (const span of phases) {
     cues.push({ t: span.startSec, layer: 'visual', action: 'phase', phase: span.n })
     // music: one asset per phase if available, else drone handled by engine
     const m = input.musicAssets.filter((a) => a.phases.includes(span.n))
-    if (m.length) cues.push({ t: span.startSec, layer: 'music', action: 'play', asset: m[Math.floor(Math.random() * m.length)].id })
-    else cues.push({ t: span.startSec, layer: 'music', action: 'play' }) // drone
+    if (m.length) { cues.push({ t: span.startSec, layer: 'music', action: 'play', asset: m[Math.floor(Math.random() * m.length)].id }); lastTrack = '' }
+    else {
+      // built-in music per phase; it restarts only when the track changes, so the journey flows
+      const tr = MODE_MUSIC[mode as keyof typeof MODE_MUSIC]?.[span.n]
+      if (!tr) cues.push({ t: span.startSec, layer: 'music', action: 'play' }) // drone fallback
+      else if (tr !== lastTrack) { cues.push({ t: span.startSec, layer: 'music', action: 'play', track: tr }); lastTrack = tr }
+    }
     // breath: starts after the narration that explains it
     const bp = breathFor(mode, span.n, input.breathEnabled)
     const bt = Math.max(span.startSec, sched.breathStartAfter.get(span.n) ?? span.startSec)
