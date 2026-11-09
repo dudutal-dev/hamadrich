@@ -45,6 +45,10 @@ function poseFor(label: string): Pose {
   if (/הוא מדבר/.test(l)) return { ...p, dist: 0.8, speak: 'him' }
   if (/היא מדברת/.test(l)) return { ...p, dist: 0.8, speak: 'her' }
   if (/שיתוף/.test(l)) return { ...p, dist: 0.7, glow: 0.9 }
+  // switching turns mid-evening: stay close (don't jump back to the opening distance)
+  if (/החלפה/.test(l)) return { ...p, dist: 0.62, tiltHim: 0.08, tiltHer: 0.08, glow: 0.95 }
+  // closing moment of an evening ("שניכם" alone): lying close, glowing
+  if (l.trim() === 'שניכם') return { ...p, dist: 0.4, tiltHim: 0.15, tiltHer: 0.15, leanHim: 0.05, leanHer: 0.05, glow: 1.1 }
   return p
 }
 
