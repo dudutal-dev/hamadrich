@@ -7,6 +7,7 @@ import { g, useAddress } from '../address'
 import { AddressPicker } from './AddressPicker'
 import { PHASE_NAMES } from '../engine/plan'
 import { checkForUpdate, versionLabel } from '../version'
+import { type MediaProgress, countCachedMedia, downloadMedia, mediaProgress } from '../offline'
 
 type Tab = 'voice' | 'music' | 'settings'
 
@@ -181,23 +182,43 @@ function SettingsPane() {
 }
 
 function VersionInfo() {
-  const [state, setState] = useState<'idle' | 'checking' | 'latest'>('idle')
+  // truthful update status: driven by the service worker's real install events (see main.tsx)
+  const [state, setState] = useState<'idle' | 'checking' | 'downloading' | 'latest' | 'failed'>('idle')
+  const [media, setMedia] = useState<MediaProgress>(mediaProgress)
+  useEffect(() => {
+    const onU = (e: Event) => { const d = (e as CustomEvent).detail as string; setState(d === 'downloading' ? 'downloading' : d === 'failed' ? 'failed' : 'latest') }
+    const onM = (e: Event) => setMedia((e as CustomEvent<MediaProgress>).detail)
+    window.addEventListener('hamadrich:update', onU); window.addEventListener('hamadrich:media', onM)
+    void countCachedMedia()
+    return () => { window.removeEventListener('hamadrich:update', onU); window.removeEventListener('hamadrich:media', onM) }
+  }, [])
   const check = async () => {
     setState('checking')
-    try { await checkForUpdate() } catch { /* offline */ }
-    // if a newer version exists it installs and the app reloads by itself; otherwise we're current
-    setTimeout(() => setState('latest'), 4000)
+    try { await checkForUpdate() } catch { setState('failed'); return }
+    const r = await navigator.serviceWorker?.getRegistration()
+    if (r?.installing) setState('downloading') // an update is coming in; the app reloads itself when it is ready
+    else setTimeout(() => setState((s) => (s === 'checking' ? 'latest' : s)), 2500)
   }
+  const label = { idle: 'בדוק עכשיו', checking: 'בודק…', downloading: 'מוריד עדכון…', latest: '✓ עדכני', failed: 'נסה שוב' }[state]
+  const pct = media.total ? Math.round((100 * media.have) / media.total) : 0
   return (
-    <section className="card rounded-2xl p-4 flex items-center justify-between gap-3">
-      <div>
-        <div className="label">גרסה</div>
-        <div className="text-[15px] font-medium tabular-nums mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{versionLabel()}</div>
-        <div className="text-[13px] muted mt-0.5">עדכונים נטענים אוטומטית בפתיחת האפליקציה</div>
+    <section className="card rounded-2xl p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="label">גרסה</div>
+          <div className="text-[15px] font-medium tabular-nums mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{versionLabel()}</div>
+          <div className="text-[13px] muted mt-0.5">עדכונים נטענים אוטומטית בפתיחת האפליקציה</div>
+        </div>
+        <button onClick={check} disabled={state === 'checking' || state === 'downloading'} className="btn-ghost rounded-full px-4 py-2 text-[14px] shrink-0">{label}</button>
       </div>
-      <button onClick={check} disabled={state === 'checking'} className="btn-ghost rounded-full px-4 py-2 text-[14px] shrink-0">
-        {state === 'checking' ? 'בודק…' : state === 'latest' ? '✓ עדכני' : 'בדוק עכשיו'}
-      </button>
+      <div className="flex items-center justify-between gap-3 pt-3 border-t border-ink/10">
+        <div className="min-w-0">
+          <div className="label">קול ומוזיקה בטלפון</div>
+          <div className="text-[14px] mt-0.5 tabular-nums">{media.have} / {media.total} קבצים · {pct}%{media.running ? ' · מוריד…' : media.failed ? ` · ${media.failed} נכשלו` : ''}</div>
+          <div className="h-1.5 rounded-full bg-white/10 mt-2 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--grad)' }} /></div>
+        </div>
+        {media.have < media.total && !media.running && <button onClick={() => void downloadMedia()} className="btn-ghost rounded-full px-4 py-2 text-[14px] shrink-0">הורד עכשיו</button>}
+      </div>
     </section>
   )
 }
