@@ -11,6 +11,7 @@ import { StartScreen, type StartChoice } from './ui/StartScreen'
 import { AlbumScreen } from './ui/AlbumScreen'
 import { NavIcon } from './ui/NavIcon'
 import { takeJustUpdated } from './version'
+import { type MediaProgress, downloadMedia } from './offline'
 import { getAddress } from './address'
 import { bodyJourney } from './engine/body'
 
@@ -32,6 +33,15 @@ export default function App() {
   const [startedAt, setStartedAt] = useState('')
   const [updatedTo, setUpdatedTo] = useState(justUpdated)
   const [updating, setUpdating] = useState<'downloading' | 'failed' | null>(null)
+  const [media, setMedia] = useState<MediaProgress | null>(null)
+  // fill the permanent media cache in the background; retry when back online / reopened
+  useEffect(() => {
+    const onM = (e: Event) => setMedia((e as CustomEvent<MediaProgress>).detail)
+    const go = () => { if (document.visibilityState === 'visible') void downloadMedia() }
+    window.addEventListener('hamadrich:media', onM); window.addEventListener('online', go); document.addEventListener('visibilitychange', go)
+    const id = setTimeout(go, 2500)
+    return () => { clearTimeout(id); window.removeEventListener('hamadrich:media', onM); window.removeEventListener('online', go); document.removeEventListener('visibilitychange', go) }
+  }, [])
   useEffect(() => {
     const on = (e: Event) => { const d = (e as CustomEvent).detail as string; setUpdating(d === 'downloading' ? 'downloading' : d === 'failed' ? 'failed' : null) }
     window.addEventListener('hamadrich:update', on); return () => window.removeEventListener('hamadrich:update', on)
@@ -94,6 +104,14 @@ export default function App() {
           <div className="sheet rounded-full px-5 py-2.5 text-[14px] font-medium flex items-center gap-2">
             <span className="w-2 h-2 rounded-full aura" style={{ background: updating === 'failed' ? '#E39470' : 'var(--grad)' }} />
             {updating === 'failed' ? 'ההורדה נקטעה – פתחו שוב את האפליקציה' : 'מוריד עדכון… השאירו את האפליקציה פתוחה'}
+          </div>
+        </div>
+      )}
+      {media?.running && !updating && !updatedTo && (
+        <div className="fade-in fixed z-30 top-[calc(env(safe-area-inset-top)+12px)] right-4 left-4 flex justify-center pointer-events-none">
+          <div className="sheet rounded-full px-5 py-2.5 text-[14px] font-medium flex items-center gap-2 tabular-nums">
+            <span className="w-2 h-2 rounded-full aura" style={{ background: 'var(--grad)' }} />
+            מוריד קול ומוזיקה לשימוש בלי רשת · {media.total ? Math.round((100 * media.have) / media.total) : 0}%
           </div>
         </div>
       )}

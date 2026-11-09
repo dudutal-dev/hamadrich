@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { execSync } from 'node:child_process'
+import { readdirSync } from 'node:fs'
 
 // version shown in Settings: the deployed commit (GitHub Actions sets GITHUB_SHA) + build time
 const sha = (process.env.GITHUB_SHA ?? (() => { try { return execSync('git rev-parse HEAD').toString().trim() } catch { return 'dev' } })()).slice(0, 7)
@@ -10,6 +11,8 @@ const sha = (process.env.GITHUB_SHA ?? (() => { try { return execSync('git rev-p
 export default defineConfig({
   base: './',
   define: {
+    // built-in media (voice, breath, music) – downloaded after install, file by file, into a permanent cache
+    __MEDIA__: JSON.stringify(['voice', 'breath', 'music'].flatMap((d) => readdirSync(`public/${d}`).filter((f) => f.endsWith('.mp3')).map((f) => `${d}/${f}`))),
     __APP_VERSION__: JSON.stringify(sha),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
@@ -37,8 +40,14 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,mp3}'],
+        // the update itself is only the app shell (~1 MB) so it always installs; media is cached separately (see src/offline.ts)
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         cleanupOutdatedCaches: true,
+        runtimeCaching: [{
+          urlPattern: /\/(voice|breath|music)\/[^/]+\.mp3$/,
+          handler: 'CacheFirst',
+          options: { cacheName: 'hamadrich-media', rangeRequests: true, cacheableResponse: { statuses: [0, 200] } },
+        }],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
     }),
