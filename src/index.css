@@ -125,3 +125,8 @@ input::placeholder, textarea::placeholder { color: rgba(246,242,234,0.45); }
   .fade-in, .app-bg::before, .app-bg::after, .app-bg > i, .spin-slow, .aura, .breathe { animation: none; }
   * { transition-duration: 0ms !important; }
 }
+
+/* slow drifting zoom for hero art */
+.kenburns { animation: kenburns 38s ease-in-out infinite alternate; transform-origin: 50% 30%; }
+@keyframes kenburns { from { transform: scale(1.04) translate(0, 0); } to { transform: scale(1.14) translate(-1.5%, 1%); } }
+@media (prefers-reduced-motion: reduce) { .kenburns { animation: none; } }

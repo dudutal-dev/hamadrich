@@ -45,7 +45,7 @@ export default defineConfig({
       },
       workbox: {
         // the update itself is only the app shell (~1 MB) so it always installs; media is cached separately (see src/offline.ts)
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,webp}'],
         cleanupOutdatedCaches: true,
         runtimeCaching: [{
           urlPattern: /\/(voice|breath|music|couple|journey|body)\/[^/]+\.(mp3|mp4)$/,
