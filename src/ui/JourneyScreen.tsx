@@ -8,6 +8,7 @@ import { CastSheet } from './CastSheet'
 import { CoupleFigures } from './CoupleFigures'
 import { AlbumVisuals, pickVisual } from './AlbumVisuals'
 import { pickBodyVisual } from './bodyVisuals'
+import { art } from './ScreenHero'
 import { bodyJourney } from '../engine/body'
 import { g, useAddress } from '../address'
 
@@ -123,6 +124,11 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
     <div onPointerDown={onDown} onPointerUp={onUp} onContextMenu={(e) => e.preventDefault()}
       className="h-full relative flex flex-col items-center select-none touch-none overflow-hidden" style={{ background: '#070510' }}>
       <Cosmos color={color} color2={color2} intensity={breathIntensity} phase={s.phase} paused={s.paused} levels={() => engine.levels()} focus={orbCenter} />
+      {/* breath / meditation / deep / sleep: the journey's art glows faintly through the cosmos (screen blend) */}
+      {!visual && !isCouple && engine.plan.mode !== 'body' && engine.plan.mode !== 'album' && (
+        <img src={art(engine.plan.mode)} alt="" className="absolute inset-0 w-full h-full object-cover kenburns pointer-events-none"
+          style={{ mixBlendMode: 'screen', filter: 'blur(2px) saturate(1.1)', opacity: dimAll ? 0.06 : s.paused ? 0.12 : 0.2, transition: 'opacity 2500ms' }} />
+      )}
       {visual && <>
         <AlbumVisuals pick={visual} paused={s.paused} levels={() => engine.levels()} />
         {/* soft shades keep the captions and the player readable over the scene */}

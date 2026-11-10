@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Mode } from '../db'
 import { Halo } from './Halo'
+import { art } from './ScreenHero'
 import { bodyJourney } from '../engine/body'
 import { type Address, g, useAddress } from '../address'
 
@@ -33,13 +34,18 @@ export function PrepareScreen({ mode, journey, onBegin, onCancel, loading }: { m
   const a = useAddress()
   const L = lines(a)
   const shown = mode === 'album' ? albumLines(a) : mode === 'body' && bodyJourney(journey)?.level === 3 ? coupleLines : mode === 'body' ? bodyLines(a) : mode === 'deep' ? L.deep : L.short
+  const lvl = bodyJourney(journey)?.level
+  const bg = mode === 'album' ? 'album' : mode === 'body' ? (lvl === 3 ? 'couple' : 'solo') : mode
   const [i, setI] = useState(0)
   const [mood, setMood] = useState<number | null>(null)
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % shown.length), 6000); return () => clearInterval(id) }, [shown.length])
 
   return (
     <div className="fade-in h-full flex flex-col items-center justify-between px-6 pt-[calc(env(safe-area-inset-top)+3rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)] text-center relative overflow-hidden">
-      <div className="app-bg"><i /></div>
+      <div className="absolute inset-0 pointer-events-none">
+        <img src={art(bg)} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" style={{ filter: 'blur(3px) saturate(1.1)', opacity: 0.55 }} />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 45%, rgba(14,12,21,0.35), rgba(14,12,21,0.9) 100%)' }} />
+      </div>
       <div className="relative">
         <div className="label">הכנה</div>
         <p key={i} className="fade-in text-[20px] leading-relaxed mt-8 min-h-[4.5rem] max-w-[22rem]">{shown[i % shown.length]}</p>
@@ -51,7 +57,7 @@ export function PrepareScreen({ mode, journey, onBegin, onCancel, loading }: { m
         <div className="flex justify-between">
           {[['1', 'כבד'], ['2', 'מתוח'], ['3', 'רגיל'], ['4', 'רגוע'], ['5', 'פתוח']].map(([n, l]) => (
             <button key={n} onClick={() => setMood(+n)} className="flex flex-col items-center gap-1">
-              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all duration-500 ${mood === +n ? 'border-[#EBA17A] bg-[#EBA17A]/20 font-semibold' : 'border-ink/15 opacity-85'}`}>{n}</span>
+              <span className={`w-12 h-12 rounded-full border text-[15px] flex items-center justify-center transition-all duration-500 backdrop-blur ${mood === +n ? 'border-[#EBA17A] bg-[#EBA17A]/25 font-semibold scale-110 shadow-[0_0_24px_-4px_#EBA17A]' : 'border-ink/20 bg-black/25 opacity-90'}`}>{n}</span>
               <span className="text-[12.5px] opacity-75">{l}</span>
             </button>
           ))}
