@@ -7,6 +7,7 @@ import { Orb } from './Orb'
 import { CastSheet } from './CastSheet'
 import { CoupleFigures } from './CoupleFigures'
 import { AlbumVisuals, pickVisual } from './AlbumVisuals'
+import { pickBodyVisual } from './bodyVisuals'
 import { bodyJourney } from '../engine/body'
 import { g, useAddress } from '../address'
 
@@ -37,7 +38,9 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const isAlbum = engine.plan.mode === 'album'
   const isCouple = bodyJourney(engine.plan.journey)?.level === 3
   // Psychedelic Prayers: the built-in visual journey fills the screen (only for the known recording of each track)
-  const visual = engine.plan.visuals === 'prayers' ? pickVisual(s.albumTrack, s.t - s.trackStart, s.trackDur) : null
+  // solo body journeys in feminine address: the goddess, one scene per narration beat
+  const visual = engine.plan.visuals === 'prayers' ? pickVisual(s.albumTrack, s.t - s.trackStart, s.trackDur)
+    : pickBodyVisual(engine.plan, s.t, s.phase)
   const a = useAddress()
 
   useEffect(() => { const off = engine.on(setS); return () => { off() } }, [engine])

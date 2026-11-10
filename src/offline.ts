@@ -3,16 +3,20 @@
  *  a failed file is simply retried next time. The same cache serves the files offline (CacheFirst in the SW). */
 import { db } from './db'
 import { isPsychedelicPrayers } from './engine/plan'
+import { getAddress } from './address'
 
 export const MEDIA_CACHE = 'hamadrich-media'
 const url = (p: string) => new URL(`${import.meta.env.BASE_URL}${p}`, location.href).href
 
 /** the Psychedelic Prayers visual journey (public/journey, ~85 MB) is only downloaded when that album is in the library */
 async function mediaList(): Promise<string[]> {
+  const list = [...__MEDIA__]
+  // the goddess scenes of the solo body journeys (~60 MB) only for listeners addressed in feminine form
+  if (getAddress() === 'f') list.push(...__BODY__)
   try {
-    if ((await db.albums.toArray()).some(isPsychedelicPrayers)) return [...__MEDIA__, ...__JOURNEY__]
+    if ((await db.albums.toArray()).some(isPsychedelicPrayers)) list.push(...__JOURNEY__)
   } catch { /* no db yet */ }
-  return __MEDIA__
+  return list
 }
 
 export interface MediaProgress { have: number; total: number; running: boolean; failed: number }

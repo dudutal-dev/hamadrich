@@ -28,7 +28,7 @@ const CUES: [number, number, string][] = [
 /** cue moments that open with a white flash ("WARNING! Solar shutters opening") */
 const FLASH = new Set(['9:110'])
 
-export interface VisualPick { clip: string; key: string; mirror: boolean; flash: boolean; zone: number }
+export interface VisualPick { /** media folder under public/ */ dir: 'journey' | 'body'; clip: string; key: string; mirror: boolean; flash: boolean; zone: number }
 
 /** the scene for an album track at a second within it; null when the track isn't the known recording */
 export function pickVisual(track: number, sec: number, trackDur: number): VisualPick | null {
@@ -42,10 +42,10 @@ export function pickVisual(track: number, sec: number, trackDur: number): Visual
   // a scene that returns on a later track is mirrored on every other track, so it reads as a new view
   const mirror = i !== first && t !== CUES[first][0] && (t - CUES[first][0]) % 2 === 1
   const zone = track <= 6 ? 1 : track <= 23 ? 2 : track <= 27 ? 3 : track <= 38 ? 4 : 5
-  return { clip, key: `${t}:${s}`, mirror, flash: FLASH.has(`${t}:${s}`), zone }
+  return { dir: 'journey', clip, key: `${t}:${s}`, mirror, flash: FLASH.has(`${t}:${s}`), zone }
 }
 
-const src = (name: string) => `${import.meta.env.BASE_URL}journey/${name}.mp4`
+const src = (dir: string, name: string) => `${import.meta.env.BASE_URL}${dir}/${name}.mp4`
 const RATE = 0.85 // a little slower than generated – the album is slow and spacious
 const XFADE = 1600 // ms crossfade between scenes
 
@@ -74,7 +74,7 @@ export function AlbumVisuals({ pick, paused, levels }: Props) {
       f.style.transition = 'opacity 250ms ease-in'; f.style.opacity = '1'
       setTimeout(() => { f.style.transition = 'opacity 3500ms ease-out'; f.style.opacity = '0' }, 900)
     }
-    back.src = src(pick.clip); back.loop = true; back.playbackRate = RATE
+    back.src = src(pick.dir, pick.clip); back.loop = true; back.playbackRate = RATE
     back.style.transform = pick.mirror ? 'scaleX(-1)' : 'none'
     const want = pick.clip
     const go = () => {
