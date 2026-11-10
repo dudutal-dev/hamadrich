@@ -43,3 +43,5 @@ jobs:
           done
       - id: deployment
         uses: actions/deploy-pages@v4
+        # the site now carries ~180 MB of built-in video; syncing can take longer than the 10-minute default
+        with: { timeout: 1800000 }
