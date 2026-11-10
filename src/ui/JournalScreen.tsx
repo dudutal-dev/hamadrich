@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { type JournalEntry, db } from '../db'
 import { MODE_META } from '../engine/plan'
+import { ScreenHero, art } from './ScreenHero'
 
 export function JournalScreen() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
@@ -50,17 +51,13 @@ export function JournalScreen() {
   }
 
   return (
-    <div className="fade-in flex flex-col gap-6 px-5 pt-10 pb-28">
-      <header className="flex items-end justify-between">
-        <div>
-          <h1 className="text-[34px] title-psy">יומן</h1>
-          <p className="text-[14px] opacity-80">{entries.length ? `${entries.length} מסעות` : 'המסע הראשון שלך יופיע כאן'}</p>
+    <div className="fade-in flex flex-col gap-6 px-5 pt-12 pb-28">
+      <ScreenHero img="journal" title="יומן" sub={entries.length ? `${entries.length} מסעות` : 'המסע הראשון שלך יופיע כאן'}>
+        <div className="flex gap-2 text-[13.5px] shrink-0">
+          {entries.length > 0 && <button onClick={exportMd} className="rounded-full px-3 py-1.5" style={{ background: 'rgba(14,12,21,0.55)', backdropFilter: 'blur(8px)', border: '1px solid rgba(246,242,234,0.2)' }}>ייצוא</button>}
+          {entries.length > 0 && <button onClick={clearAll} className="rounded-full px-3 py-1.5 text-red-200" style={{ background: 'rgba(14,12,21,0.55)', backdropFilter: 'blur(8px)', border: '1px solid rgba(246,242,234,0.2)' }}>ניקוי</button>}
         </div>
-        <div className="flex gap-4 text-[14px] opacity-80">
-          {entries.length > 0 && <button onClick={exportMd}>ייצוא</button>}
-          {entries.length > 0 && <button onClick={clearAll} className="text-red-300/80">ניקוי</button>}
-        </div>
-      </header>
+      </ScreenHero>
 
       <div className="grid grid-cols-2 gap-3">
         <Stat label="רצף ימים" value={String(stats.streak)} />
@@ -105,9 +102,11 @@ export function JournalScreen() {
           </li>
         ))}
         {!entries.length && (
-          <li className="card rounded-3xl p-6 text-center">
-            <div className="text-[40px] mb-2">☾</div>
+          <li className="card rounded-3xl overflow-hidden text-center">
+            <img src={art('sleep')} alt="" className="w-full aspect-[16/7] object-cover opacity-90" />
+            <div className="p-6 pt-4">
             <p className="text-[15px] opacity-80 leading-relaxed">אחרי כל מסע תענה על שאלה אחת, תקליט או תכתוב, ותסמן איך הרגשת. כאן תראה לאורך זמן מה חוזר.</p>
+            </div>
           </li>
         )}
       </ul>
@@ -116,5 +115,10 @@ export function JournalScreen() {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="card rounded-2xl p-4"><div className="text-[30px] title-psy">{value}</div><div className="text-[14px] opacity-80">{label}</div></div>
+  return (
+    <div className="relative overflow-hidden rounded-3xl p-4" style={{ background: 'linear-gradient(135deg, rgba(242,194,107,0.12), rgba(179,164,242,0.08))', border: '1px solid rgba(246,242,234,0.12)' }}>
+      <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full" style={{ background: 'radial-gradient(circle, rgba(242,194,107,0.3), transparent 70%)', filter: 'blur(10px)' }} />
+      <div className="relative text-[34px] title-psy leading-none tabular-nums">{value}</div><div className="relative text-[14px] opacity-80 mt-1.5">{label}</div>
+    </div>
+  )
 }

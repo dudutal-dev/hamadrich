@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type JournalEntry, type SessionPlan, type Settings, db, getSettings, uid } from './db'
 import { SessionEngine, unlockAudio } from './engine/audio'
 import { buildPlan } from './engine/plan'
@@ -23,6 +23,9 @@ type Stage = 'start' | 'prepare' | 'journey' | 'integration'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('journey')
+  // every tab opens at its top (its image header), not where the previous tab was scrolled to
+  const scroller = useRef<HTMLDivElement>(null)
+  useEffect(() => { scroller.current?.scrollTo({ top: 0 }) }, [tab])
   const [stage, setStage] = useState<Stage>('start')
   const [choice, setChoice] = useState<StartChoice | null>(null)
   const [plan, setPlan] = useState<SessionPlan | null>(null)
@@ -92,7 +95,7 @@ export default function App() {
   if (stage === 'integration' && draft) return <IntegrationScreen draft={draft} question={bodyJourney(plan?.journey)?.question} onDone={reset} />
 
   return (
-    <div className="h-full overflow-y-auto relative isolate pt-[env(safe-area-inset-top)]">
+    <div ref={scroller} className="h-full overflow-y-auto relative isolate pt-[env(safe-area-inset-top)]">
       <div className="app-bg"><i /></div>
       <div className="relative z-10">
         {tab === 'journey' && <StartScreen onStart={onStart} onAlbums={() => setTab('album')} />}

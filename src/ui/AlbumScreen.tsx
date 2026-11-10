@@ -5,6 +5,7 @@ import { INTENTIONS, INTENTION_META, PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES, i
 import { analyzeAlbumBreath, importAlbum } from '../engine/library'
 import type { StartChoice } from './StartScreen'
 import { g, useAddress } from '../address'
+import { ScreenHero, art } from './ScreenHero'
 
 const SEL_KEY = 'hamadrich:album'
 const readSel = () => { try { return localStorage.getItem(SEL_KEY) } catch { return null } }
@@ -94,13 +95,15 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   if (!album) {
     return (
       <div className="fade-in flex flex-col gap-6 px-5 pt-12 pb-32">
-        <h1 className="text-[34px] title-psy">אלבומים</h1>
-        <p className="text-[15px] muted leading-relaxed">כל אלבום שבנוי כמסע יכול להפוך לסשן: האפליקציה מחלקת אותו לחמישה פרקים, מזהה איפה אין דיבור ומוסיפה שם נשימה, ומציירת לפי המוזיקה.</p>
+        <ScreenHero img="albums" title="אלבומים" tall sub="כל אלבום שבנוי כמסע יכול להפוך לסשן: חמישה פרקים, נשימה בשקטים, ועולם שמגיב למוזיקה." />
         {importer}
-        <div className="card rounded-3xl p-6 flex flex-col gap-3">
+        <div className="card rounded-3xl overflow-hidden flex flex-col">
+          <img src={art('album')} alt="" className="w-full aspect-[16/8] object-cover" />
+          <div className="p-6 pt-4 flex flex-col gap-3">
           <div className="text-[21px] font-semibold">Psychedelic Prayers</div>
           <p className="text-[15px] opacity-80 leading-relaxed">הקריינות של Blakely Saucier על המוזיקה של Desert Dwellers ו-Liquid Bloom – 55 רצועות, 93 דקות, בנויות כמסע לפי הספר של טימותי לירי. זה האלבום שהאפליקציה נבנתה סביבו.</p>
           <a href="https://desertdwellersmusic.bandcamp.com/album/psychedelic-prayers" target="_blank" rel="noreferrer" className="rounded-2xl py-3 text-center btn-ghost text-[15px]">לדף האלבום ב-Bandcamp</a>
+          </div>
         </div>
       </div>
     )
@@ -108,7 +111,8 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
 
   return (
     <div className="fade-in flex flex-col gap-6 px-5 pt-12 pb-32">
-      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1" style={{ scrollbarWidth: 'none' }}>
+      <ScreenHero img={pp ? 'album' : 'albums'} title="אלבומים" tall sub={pp ? 'תפילות פסיכדליות · מסע ויזואלי מלא' : album.name} />
+      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 -mt-2" style={{ scrollbarWidth: 'none' }}>
         {albums.map((x) => (
           <button key={x.id} onClick={() => select(x.id)} className={`shrink-0 px-4 py-2 rounded-full text-[14px] border transition-all ${x.id === album.id ? 'chip-on font-semibold' : 'chip'}`}>{x.name}</button>
         ))}

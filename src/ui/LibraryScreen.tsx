@@ -8,14 +8,15 @@ import { AddressPicker } from './AddressPicker'
 import { PHASE_NAMES } from '../engine/plan'
 import { checkForUpdate, versionLabel } from '../version'
 import { type MediaProgress, countCachedMedia, downloadMedia, mediaProgress } from '../offline'
+import { ScreenHero } from './ScreenHero'
 
 type Tab = 'voice' | 'music' | 'settings'
 
 export function LibraryScreen() {
   const [tab, setTab] = useState<Tab>('voice')
   return (
-    <div className="fade-in flex flex-col gap-5 px-5 pt-10 pb-28">
-      <h1 className="text-[34px] title-psy">ספרייה</h1>
+    <div className="fade-in flex flex-col gap-5 px-5 pt-12 pb-28">
+      <ScreenHero img="library" title="ספרייה" sub="קריינות, מוזיקה והגדרות" />
       <div className="flex gap-1 p-1 rounded-full chip text-[15px]">
         {(['voice', 'music', 'settings'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-full transition-all ${tab === t ? 'btn-psy' : 'opacity-85'}`}>{{ voice: 'קריינות', music: 'מוזיקה', settings: 'הגדרות' }[t]}</button>
