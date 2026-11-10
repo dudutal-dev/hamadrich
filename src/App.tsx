@@ -95,7 +95,7 @@ export default function App() {
     <div className="h-full overflow-y-auto relative isolate pt-[env(safe-area-inset-top)]">
       <div className="app-bg"><i /></div>
       <div className="relative z-10">
-        {tab === 'journey' && <StartScreen onStart={onStart} />}
+        {tab === 'journey' && <StartScreen onStart={onStart} onAlbums={() => setTab('album')} />}
         {tab === 'album' && <AlbumScreen onStart={onStart} />}
         {tab === 'journal' && <JournalScreen />}
         {tab === 'library' && <LibraryScreen />}
