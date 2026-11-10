@@ -71,6 +71,8 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
   const onUp = (e: React.PointerEvent) => {
     if (isUI(e) || !pressStart.current) return
     const held = Date.now() - pressStart.current; pressStart.current = 0
+    // the phone stopped the music: any tap brings it back (and the journey with it)
+    if (s.blocked && !emergency && !confirmExit) { engine.resume(); flash('ממשיכים'); return }
     const dy = touchY.current - e.clientY
     if (emergency || confirmExit) return
     const cleanable = ((isCouple && vp.w > vp.h) || !!visual) && Math.abs(dy) < 90 && held < 700
@@ -151,7 +153,7 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
           ? (landscape ? null : <CoupleFigures mode="box" label={s.label} paused={s.paused} levels={() => engine.levels()} size={{ w: vp.w, h: Math.round(Math.min(vp.h * (tv ? 0.62 : 0.56), vp.w * 1.25)) }} />)
           : visual ? null
           : <Orb color={color} color2={color2} breath={s.breath} stepSec={stepSec} progress={progress} dim={dimAll} size={orbSize} />}</div>
-        <div className={`${isCouple ? (landscape ? '' : 'mt-3') : tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: dimAll || clean ? 0 : 1, transition: `opacity ${clean ? 600 : 1200}ms` }}>
+        <div className={`${isCouple ? (landscape ? '' : 'mt-3') : tv ? (landscape ? 'min-w-[24vw]' : 'mt-[4vh]') : 'min-h-20 mt-8'} flex flex-col items-center`} style={{ opacity: (dimAll || clean) && !s.blocked ? 0 : 1, transition: `opacity ${clean ? 600 : 1200}ms` }}>
           {s.label && <div key={s.label} className="fade-in text-[clamp(20px,4.5vmin,44px)] font-semibold mb-3 text-center px-4" style={{ color: color2, textShadow: `0 0 24px ${color}` }}>{s.label}</div>}
           {s.breath !== 'none' && !s.paused ? (
             <>
@@ -159,7 +161,9 @@ export function JourneyScreen({ engine, settings, onEnd }: { engine: SessionEngi
               <div className="text-[14px] opacity-75 mt-1">{pat.label}</div>
             </>
           ) : (
-            <div className="text-[20px] font-semibold opacity-85 tabular-nums">{s.paused ? 'עצירה' : s.done ? 'המסע נגמר' : fmt(remaining)}</div>
+            s.blocked
+              ? <div className="text-[18px] font-semibold text-center px-6" style={{ textShadow: '0 1px 10px #000' }}>הטלפון עצר את המוזיקה · נגיעה להמשך</div>
+              : <div className="text-[20px] font-semibold opacity-85 tabular-nums">{s.paused ? 'עצירה' : s.done ? 'המסע נגמר' : fmt(remaining)}</div>
           )}
         </div>
       </div>
