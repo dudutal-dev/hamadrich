@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { type JournalEntry, type SessionPlan, type Settings, db, getSettings, uid } from './db'
-import { SessionEngine } from './engine/audio'
+import { SessionEngine, unlockAudio } from './engine/audio'
 import { buildPlan } from './engine/plan'
 import { IntegrationScreen } from './ui/IntegrationScreen'
 import { JournalScreen } from './ui/JournalScreen'
@@ -67,6 +67,7 @@ export default function App() {
 
   const onBegin = async () => {
     if (!plan) return
+    unlockAudio() // inside the tap: unlocks the music elements on iOS (must run before any await)
     setLoading(true)
     const s = await getSettings(); setSettings(s)
     const e = new SessionEngine(plan)

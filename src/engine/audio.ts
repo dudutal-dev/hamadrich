@@ -46,6 +46,8 @@ export interface EngineState {
   musicGain: number
   /** on-screen instruction (couple evenings) */
   label: string
+  /** the phone stopped the music and won't restart it without a tap – the session is paused until then */
+  blocked: boolean
 }
 
 type Listener = (s: EngineState) => void
@@ -155,6 +157,38 @@ class Drone {
 /** Streaming track via HTMLAudioElement.
  *  direct=true: NOT routed through the AudioContext – iOS keeps playing it in the background like a music app.
  *  Volume/fades are then done on the element itself. */
+
+/** iOS lets a media element play without a tap only if that same element was started inside a tap.
+ *  So music runs on a small pool of elements that are unlocked once, in the tap on "I'm ready", and then reused
+ *  for every track (a new Audio() per track could be refused later → silence until the screen is touched). */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
+const pool: HTMLAudioElement[] = []
+const owner = new WeakMap<HTMLAudioElement, object>()
+let poolIdx = 0
+export function unlockAudio() {
+  // Web Audio (breath, voice) and the music share one "playback" session, so a breath sound is no longer an
+  // interruption that makes iOS pause the music (Safari 17+)
+  try { const as = (navigator as unknown as { audioSession?: { type: string } }).audioSession; if (as) as.type = 'playback' } catch { /* older iOS */ }
+  while (pool.length < 3) { const el = new Audio(); el.setAttribute('x-webkit-airplay', 'allow'); el.preload = 'auto'; pool.push(el) }
+  for (const el of pool) {
+    if (el.src && !el.paused) continue
+    el.src = SILENT_WAV
+    void el.play().then(() => { if (el.src === SILENT_WAV) el.pause() }).catch(() => {})
+  }
+}
+/** the next free pooled element (never one still owned by a track that is playing or fading out) */
+function takeElement(by: object): HTMLAudioElement {
+  for (let k = 0; k < pool.length; k++) {
+    const el = pool[(poolIdx + k) % pool.length]
+    if (!owner.has(el)) { poolIdx = (poolIdx + k + 1) % pool.length; owner.set(el, by); return el }
+  }
+  const el = new Audio(); owner.set(el, by); return el // pool exhausted (fast skipping): plain element
+}
+function releaseElement(el: HTMLAudioElement, by: object) {
+  if (owner.get(el) !== by) return
+  el.pause(); el.removeAttribute('src'); el.load(); owner.delete(el)
+}
+
 class Track {
   private el: HTMLAudioElement
   private shadow: HTMLAudioElement | null = null
@@ -164,9 +198,12 @@ class Track {
   private url: string
   private target: number
   private fadeTimer = 0
+  /** called when the system refuses to (re)start the music without a tap */
+  onBlocked: (() => void) | null = null
   constructor(private ctx: AudioContext, out: AudioNode, blob: Blob, loop: boolean, gainDb: number, fadeIn: number, private direct = false, private busGain = 1, analyser: AnalyserNode | null = null) {
     this.url = URL.createObjectURL(blob)
-    this.el = new Audio()
+    // direct playback uses an unlocked pooled element; graph playback needs its own (one MediaElementSource per element)
+    this.el = direct ? takeElement(this) : new Audio()
     this.el.setAttribute('x-webkit-airplay', 'allow') // AirPlay picker can target this element
     this.el.src = this.url
     this.el.loop = loop
@@ -174,7 +211,7 @@ class Track {
     this.target = Math.pow(10, gainDb / 20)
     if (direct) {
       this.el.volume = 0
-      void this.el.play().catch((e) => console.warn('track play failed', e))
+      void this.el.play().catch((e) => this.refused(e))
       this.fadeTo(this.target * this.busGain, fadeIn)
       // visual tap: a second element, silent, feeding the analyser (only works while the page is visible)
       if (analyser) {
@@ -205,11 +242,15 @@ class Track {
   setBus(v: number) { this.busGain = v; if (this.direct) this.fadeTo(this.target * v, 0.3) }
   duck(factor: number, sec: number) { if (this.direct) this.fadeTo(this.target * this.busGain * factor, sec) }
   pause() { this.el.pause(); this.shadow?.pause() }
-  resume() { void this.el.play().catch(() => {}); if (this.shadow) { this.shadow.currentTime = this.el.currentTime; void this.shadow.play().catch(() => {}) } }
+  private refused(e: unknown) {
+    console.warn('track play refused', e)
+    if (e instanceof DOMException && e.name === 'NotAllowedError') setTimeout(() => this.onBlocked?.(), 0)
+  }
+  resume() { void this.el.play().catch((e) => this.refused(e)); if (this.shadow) { this.shadow.currentTime = this.el.currentTime; void this.shadow.play().catch(() => {}) } }
   /** keep the silent visual copy aligned with the audible one */
   syncShadow() { if (!this.shadow) return; if (Math.abs(this.shadow.currentTime - this.el.currentTime) > 0.35) this.shadow.currentTime = this.el.currentTime; if (this.shadow.paused && !this.el.paused) void this.shadow.play().catch(() => {}) }
   /** iOS may have paused the element while backgrounded; if we are supposed to be playing, play again */
-  kick() { if (this.el.paused && !this.el.ended && this.el.src) void this.el.play().catch(() => {}) }
+  kick() { if (this.el.paused && !this.el.ended && this.el.getAttribute('src')) void this.el.play().catch((e) => this.refused(e)) }
   get ended() { return this.el.ended }
   /** the audible media element (for AirPlay / Remote Playback) */
   get media() { return this.el }
@@ -218,7 +259,8 @@ class Track {
       const t = this.ctx.currentTime
       this.gain.gain.cancelScheduledValues(t); this.gain.gain.setValueAtTime(this.gain.gain.value, t); this.gain.gain.linearRampToValueAtTime(0, t + fade)
     }
-    setTimeout(() => { this.el.pause(); this.el.src = ''; this.src?.disconnect(); this.gain?.disconnect(); if (this.shadow) { this.shadow.pause(); this.shadow.src = ''; this.shadowSrc?.disconnect() } URL.revokeObjectURL(this.url) }, fade * 1000 + 100)
+    this.onBlocked = null
+    setTimeout(() => { if (this.direct) releaseElement(this.el, this); else { this.el.pause(); this.el.src = '' } this.src?.disconnect(); this.gain?.disconnect(); if (this.shadow) { this.shadow.pause(); this.shadow.src = ''; this.shadowSrc?.disconnect() } URL.revokeObjectURL(this.url) }, fade * 1000 + 100)
   }
 }
 
@@ -298,7 +340,7 @@ export class SessionEngine {
 
   constructor(public plan: SessionPlan) {
     this.musicCues = plan.cues.filter((c) => c.layer === 'music' && c.asset)
-    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, albumTrack: 0, trackDur: 0, trackStart: 0, trackCount: this.musicCues.length, musicGain: 0.8, label: '' }
+    this.state = { t: 0, phase: 1, phaseName: PHASE_NAMES[1], running: false, paused: false, done: false, breath: 'none', breathProgress: 0, breathPattern: 'none', durationSec: plan.durationSec, trackName: '', trackNo: 0, albumTrack: 0, trackDur: 0, trackStart: 0, trackCount: this.musicCues.length, musicGain: 0.8, label: '', blocked: false }
   }
 
   private now() { return Date.now() / 1000 }
@@ -500,10 +542,21 @@ export class SessionEngine {
     const prev = this.current
     const blob = droneCache.get(droneKey(phase, this.output, binaural))
     this.current = blob
-      ? new Track(this.ctx, this.musicBus, blob, true, 0, fade, true, this.gains.music, this.analyser)
+      ? this.watch(new Track(this.ctx, this.musicBus, blob, true, 0, fade, true, this.gains.music, this.analyser))
       : new Drone(this.ctx, this.musicBus, phase, this.output, binaural, fade)
     prev?.stop(fade)
     this.state.trackName = name
+  }
+
+  /** if the phone refuses to play the current music without a tap, pause the whole session (the clock must not run on in silence) */
+  private watch(t: Track): Track {
+    t.onBlocked = () => {
+      if (this.current !== t || !this.state.running) return
+      if (!this.state.paused) this.pause()
+      this.state.blocked = true
+      this.emit()
+    }
+    return t
   }
 
   private setTrackInfo(c: Cue) {
@@ -525,12 +578,12 @@ export class SessionEngine {
     if (c.layer === 'music' && c.action === 'play') {
       const prev = this.current
       if (c.track && this.blobs.has(`track:${c.track}`)) {
-        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(`track:${c.track}`)!, true, 0, prev ? 8 : 4, true, this.gains.music, this.analyser)
+        this.current = this.watch(new Track(this.ctx, this.musicBus, this.blobs.get(`track:${c.track}`)!, true, 0, prev ? 8 : 4, true, this.gains.music, this.analyser))
         prev?.stop(8)
         this.state.trackName = this.names.get(`track:${c.track}`) ?? ''
       } else if (c.asset && this.blobs.has(c.asset)) {
         const isAlbum = this.plan.mode === 'album'
-        this.current = new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music, this.analyser)
+        this.current = this.watch(new Track(this.ctx, this.musicBus, this.blobs.get(c.asset)!, !isAlbum, 0, isAlbum ? 1.5 : XFADE, true, this.gains.music, this.analyser))
         prev?.stop(isAlbum ? 1.5 : XFADE)
         this.setTrackInfo(c)
       } else {
@@ -611,6 +664,9 @@ export class SessionEngine {
 
   resume() {
     if (!this.state.paused || !this.ctx) return
+    this.state.blocked = false
+    // start the music element right here, inside the tap (iOS); the clock follows once the context is running
+    if (!this.pendingMusic && this.current instanceof Track) this.current.resume()
     void this.ctx.resume().then(() => {
       if (!this.state.paused) return
       this.startWall = this.now() - this.pausedAt
