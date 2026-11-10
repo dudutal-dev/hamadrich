@@ -203,8 +203,9 @@ function IntroSheet({ onClose }: { onClose: () => void }) {
   const a = useAddress()
   return (
     <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={onClose}>
-      <div className="fade-in w-full max-h-[92vh] overflow-y-auto rounded-t-[32px] px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-5" style={{ background: 'linear-gradient(180deg, #E8842E33, #15112A 25%)', border: '1px solid rgba(242,238,230,0.12)' }} onClick={(e) => e.stopPropagation()}>
+      <div className="fade-in relative w-full max-h-[92vh] overflow-y-auto rounded-t-[32px] px-6 pt-5 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-5" style={{ background: 'linear-gradient(180deg, #E8842E33, #15112A 25%)', border: '1px solid rgba(242,238,230,0.12)' }} onClick={(e) => e.stopPropagation()}>
         <div className="w-10 h-1 rounded-full bg-ink/30 self-center" />
+        <div className="sticky top-0 z-20 h-0 -mb-5"><button onClick={onClose} aria-label="סגירה" className="absolute -top-1 left-0 w-10 h-10 rounded-full text-[18px] flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(246,242,234,0.2)', backdropFilter: 'blur(10px)' }}>✕</button></div>
         <h2 className="text-[28px] title-psy leading-tight">תפילות פסיכדליות – המסע</h2>
 
         <Section title="מאיפה זה בא">

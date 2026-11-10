@@ -225,8 +225,9 @@ export function StartScreen({ onStart, onAlbums }: { onStart: (c: StartChoice) =
 
       {info && createPortal(
         <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.85)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={() => setInfo(null)}>
-          <div className="fade-in w-full rounded-t-[32px] p-6 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-4" style={{ background: `linear-gradient(180deg, ${MODE_GRAD[info][0]}22, #15112A 35%)`, border: '1px solid rgba(246,242,234,0.14)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="fade-in relative w-full max-h-[92vh] overflow-y-auto rounded-t-[32px] p-6 pb-[calc(env(safe-area-inset-bottom)+24px)] flex flex-col gap-4" style={{ background: `linear-gradient(180deg, ${MODE_GRAD[info][0]}22, #15112A 35%)`, border: '1px solid rgba(246,242,234,0.14)' }} onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-ink/30 self-center -mt-2" />
+            <button onClick={() => setInfo(null)} aria-label="סגירה" className="absolute top-4 left-4 w-10 h-10 rounded-full text-[18px] flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(246,242,234,0.2)' }}>✕</button>
             <div className="flex items-center gap-3"><span className="text-[28px]" style={{ color: MODE_GRAD[info][0] }}>{MODE_ICON[info]}</span><h2 className="text-[26px] font-semibold">{MODE_META[info].name}</h2></div>
             <p className="text-[16px] leading-relaxed">{MODE_LONG[info].what}</p>
             <div><div className="label mb-1">מתי</div><p className="text-[15px] opacity-85 leading-relaxed">{MODE_LONG[info].when}</p></div>
@@ -247,13 +248,16 @@ export function StartScreen({ onStart, onAlbums }: { onStart: (c: StartChoice) =
 
 function BodyCard({ j, on, onPick, onInfo }: { j: BodyJourney; on: boolean; onPick: () => void; onInfo: () => void }) {
   return (
-    <div onClick={onPick} role="button" className={`rounded-3xl p-4 text-right transition-all duration-500 border cursor-pointer ${on ? 'chip-on' : 'card'}`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="text-[18px] font-semibold">{j.title}</div>
-        <div className="text-[14px] opacity-80 shrink-0">{j.defaultMin} דק'</div>
+    <div onClick={onPick} role="button" className={`rounded-3xl p-3 text-right transition-all duration-500 border cursor-pointer flex gap-3.5 items-stretch ${on ? 'chip-on' : 'card'}`}>
+      <img src={art(`j/${j.id}`)} alt="" loading="lazy" className="w-24 self-stretch min-h-[7.5rem] rounded-2xl object-cover shrink-0" style={{ background: '#000', boxShadow: on ? '0 0 0 2px rgba(242,194,107,0.7)' : 'none' }} />
+      <div className="flex-1 min-w-0 py-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-[17.5px] font-semibold leading-tight">{j.title}</div>
+          <div className="text-[13.5px] opacity-80 shrink-0">{j.defaultMin} דק'</div>
+        </div>
+        <div className="text-[14px] muted mt-1 leading-relaxed">{j.sub}</div>
+        <button onClick={(e) => { e.stopPropagation(); onInfo() }} className="text-[14px] mt-1.5 underline underline-offset-4 opacity-80">מה קורה במסע הזה?</button>
       </div>
-      <div className="text-[14px] muted mt-1 leading-relaxed">{j.sub}</div>
-      <button onClick={(e) => { e.stopPropagation(); onInfo() }} className="text-[14px] mt-2 underline underline-offset-4 opacity-80">מה קורה במסע הזה?</button>
     </div>
   )
 }
@@ -266,8 +270,9 @@ function BodyInfo({ j, onClose, onPick }: { j: BodyJourney; onClose: () => void;
   return createPortal(
     <div className="fixed inset-0 flex items-end" style={{ zIndex: 1000, background: 'rgba(7,5,16,0.88)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }} onClick={onClose}>
       <div className="fade-in w-full max-h-[92vh] overflow-y-auto rounded-t-[32px] flex flex-col" style={{ background: '#15112A', border: '1px solid rgba(246,242,234,0.14)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-20 h-0"><button onClick={onClose} aria-label="סגירה" className="absolute top-3 left-3 w-10 h-10 rounded-full text-[18px] leading-none flex items-center justify-center" style={{ background: 'rgba(14,12,21,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(246,242,234,0.25)' }}>✕</button></div>
         <div className="relative h-44 shrink-0 overflow-hidden rounded-t-[32px]" style={{ background: '#000' }}>
-          <img src={art(solo ? 'body' : 'couple')} alt="" className={`absolute inset-0 w-full h-full ${solo ? 'object-cover' : 'object-contain'}`} />
+          <img src={art(`j/${j.id}`)} alt="" className={`absolute inset-0 w-full h-full ${solo ? 'object-cover' : 'object-contain'}`} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(21,17,42,0) 30%, #15112A 100%)' }} />
           <div className="absolute bottom-3 right-6 left-6"><div className="label">{j.level === 1 ? 'גוף ומיניות' : j.level === 2 ? 'מתקדם · מגע ועוררות' : 'ערב זוגי'} · {j.minMin}–{j.maxMin} דק'</div><h2 className="text-[26px] font-semibold leading-tight">{j.title}</h2></div>
         </div>
@@ -281,6 +286,7 @@ function BodyInfo({ j, onClose, onPick }: { j: BodyJourney; onClose: () => void;
           <div className="rounded-2xl p-3.5 text-[14px] leading-relaxed" style={{ background: 'rgba(124,207,190,0.08)', border: '1px solid rgba(124,207,190,0.25)' }}><span className="font-semibold">בטיחות · </span>{gx(a, L.safety)} לחיצה ארוכה של 3 שניות – דרך הביתה, תמיד.</div>
           <div><div className="label mb-1">שאלה ליומן</div><p className="text-[15px] opacity-90 italic">״{j.question}״</p></div>
           <button onClick={onPick} className="rounded-2xl py-4 btn-psy text-[17px] mt-1">{g(a, 'בחר', 'בחרי')} {j.title}</button>
+          <button onClick={onClose} className="text-[15px] opacity-80 py-2">סגירה</button>
         </div>
       </div>
     </div>,
