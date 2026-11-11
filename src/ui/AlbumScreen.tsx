@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type Album, type Asset, type Phase, db } from '../db'
 import { INTENTIONS, INTENTION_META, PHASE_COLORS, PHASE_COLORS2, PHASE_NAMES, isPsychedelicPrayers } from '../engine/plan'
-import { analyzeAlbumBreath, importAlbum } from '../engine/library'
+import { analyzeAlbumBreath, deleteAlbum, importAlbum } from '../engine/library'
 import type { StartChoice } from './StartScreen'
 import { g, useAddress } from '../address'
 import { ScreenHero, art } from './ScreenHero'
@@ -50,6 +50,13 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
   const [intro, setIntro] = useState(false)
 
   const load = (sel = readSel()) => fetchAlbums(sel).then((r) => { setAlbums(r.albums); setAlbum(r.album); setTracks(r.tracks) })
+  const remove = async () => {
+    if (!album || !confirm(`למחוק את "${album.name}" מהאפליקציה? הקבצים המקוריים אצלך לא נמחקים.`)) return
+    preview?.el.pause(); setPreview(null)
+    await deleteAlbum(album.id)
+    try { localStorage.removeItem(SEL_KEY) } catch { /* */ }
+    await load(null)
+  }
   const select = (id: string) => { try { localStorage.setItem(SEL_KEY, id) } catch { /* */ } preview?.el.pause(); setPreview(null); setOpenPhase(null); setEditing(false); void load(id) }
   const pp = !!album && isPsychedelicPrayers(album)
   const needsAnalysis = !!album && !pp && tracks.some((t) => t.breathWindows === undefined)
@@ -130,7 +137,10 @@ export function AlbumScreen({ onStart }: { onStart: (c: StartChoice) => void }) 
             : 'האלבום מוביל. הפרקים חולקו לפי זמן ההאזנה (אפשר לשנות ב"ערוך מיפוי"), הנשימה נכנסת רק בקטעים בלי דיבור, והחלל מגיב למוזיקה.'}</p>
           {needsAnalysis && <button onClick={() => void analyze()} disabled={!!busy} className="mt-4 rounded-full px-4 py-2 text-[14px] btn-ghost">{busy || 'זיהוי קטעי דיבור (לנשימה)'}</button>}
           {!pp && !needsAnalysis && <p className="text-[13px] muted mt-3">נמצאו {Math.round(breathSec / 60)} דקות בלי דיבור להנחיית נשימה.</p>}
-          {pp && <button onClick={() => setIntro(true)} className="mt-4 rounded-full px-4 py-2 text-[14px]" style={{ background: 'rgba(12,10,23,0.5)', border: '1px solid rgba(246,242,234,0.3)', fontWeight: 500 }}>✦ מה המסע הזה ומה המשמעות</button>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {pp && <button onClick={() => setIntro(true)} className="rounded-full px-4 py-2 text-[14px]" style={{ background: 'rgba(12,10,23,0.5)', border: '1px solid rgba(246,242,234,0.3)', fontWeight: 500 }}>✦ מה המסע הזה ומה המשמעות</button>}
+            <button onClick={() => void remove()} className="rounded-full px-4 py-2 text-[14px] text-red-200" style={{ background: 'rgba(12,10,23,0.5)', border: '1px solid rgba(252,165,165,0.35)' }}>🗑 מחק אלבום</button>
+          </div>
         </div>
       </header>
       {intro && createPortal(<IntroSheet onClose={() => setIntro(false)} />, document.body)}
